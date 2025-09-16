@@ -32,13 +32,18 @@ jobs:
         run: cabal update
 
       - name: Install tooling
-        run: cabal install --installdir=$HOME/.cabal/bin --overwrite-policy=always ormolu hlint
+        run: |
+          cabal install \
+            --installdir="$HOME/.cabal/bin" \
+            --overwrite-policy=always \
+            ormolu-0.7.7.0 \
+            hlint
 
       - name: Ormolu formatting check
         run: |
           files=$(git ls-files '*.hs')
           if [ -n "$files" ]; then
-            ormolu --mode check $files
+            cabal exec -- ormolu --mode check $files
           fi
 
       - name: HLint
