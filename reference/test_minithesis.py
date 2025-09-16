@@ -129,7 +129,7 @@ def test_reuses_results_from_the_database(tmpdir):
     assert count == prev_count + 2
 
 
-def test_test_cases_satisfy_preconditions():
+def test_test_cases_satisfy_preconditions():  # -- PORTED
     @run_test()
     def _(test_case):
         n = test_case.choice(10)
