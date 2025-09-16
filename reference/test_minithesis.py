@@ -298,7 +298,7 @@ def test_prints_a_top_level_weighted(capsys):
     assert captured.out.strip() == "weighted(0.5): False"
 
 
-def test_errors_when_using_frozen():
+def test_errors_when_using_frozen():  # -- PORTED
     tc = TC.for_choices([0])
     tc.status = Status.VALID
 
