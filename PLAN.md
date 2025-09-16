@@ -20,6 +20,7 @@ Keep this document up to date as a living record of porting progress from the Py
 - ✅ test_errors_when_using_frozen
 - ✅ test_errors_on_too_large_choice
 - ✅ test_test_cases_satisfy_preconditions
+- ✅ test_error_on_too_strict_precondition
 
 ## Design Notes
 - Library module will be decomposed into `Minithesis.TestCase`, `Minithesis.State`, and generator modules as features land.

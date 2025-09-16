@@ -137,7 +137,7 @@ def test_test_cases_satisfy_preconditions():  # -- PORTED
         assert n != 0
 
 
-def test_error_on_too_strict_precondition():
+def test_error_on_too_strict_precondition():  # -- PORTED
     with pytest.raises(Unsatisfiable):
 
         @run_test()

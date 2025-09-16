@@ -23,8 +23,19 @@ spec = do
         n <- choice tc 9
         assume tc (n /= 0)
         n `shouldSatisfy` (/= 0)
+    it "raises Unsatisfiable when all test cases are rejected" $ do
+      let opts = defaultRunOptions {runQuiet = True}
+          action =
+            runTest opts $ \tc -> do
+              _ <- choice tc 9
+              assume tc False
+      action `shouldThrow` isUnsatisfiable
+
 isFrozen :: Frozen -> Bool
 isFrozen _ = True
 
 isValueError :: ValueError -> Bool
 isValueError _ = True
+
+isUnsatisfiable :: Unsatisfiable -> Bool
+isUnsatisfiable _ = True
