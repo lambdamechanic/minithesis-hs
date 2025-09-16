@@ -34,15 +34,6 @@ jobs:
       - name: Install tooling
         run: cabal install --installdir=$HOME/.cabal/bin --overwrite-policy=always ormolu hlint
 
-      - name: Build
-        run: cabal build all
-
-      - name: Run tests
-        run: cabal test all --test-show-details=direct
-
-      - name: Cabal check
-        run: cabal check
-
       - name: Ormolu formatting check
         run: |
           files=$(git ls-files '*.hs')
@@ -56,3 +47,12 @@ jobs:
           if [ -n "$files" ]; then
             hlint $files
           fi
+
+      - name: Build
+        run: cabal build all
+
+      - name: Run tests
+        run: cabal test all --test-show-details=direct
+
+      - name: Cabal check
+        run: cabal check
