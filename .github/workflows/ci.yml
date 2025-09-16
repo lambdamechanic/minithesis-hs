@@ -16,7 +16,7 @@ jobs:
         uses: haskell-actions/setup@v2
         with:
           ghc-version: "9.8.2"
-          cabal-version: "latest"
+          cabal-version: "3.12.1.0"
 
       - name: Cache Cabal store
         uses: actions/cache@v4
@@ -48,11 +48,23 @@ jobs:
             hlint $files
           fi
 
-      - name: Build
-        run: cabal build all
+      - name: Build (per-component)
+        run: |
+          cabal build all --enable-tests --enable-per-component
 
-      - name: Run tests
-        run: cabal test all --test-show-details=direct
+      - name: Run tests with coverage-for library only
+        run: |
+          set -euo pipefail
+          # Ensure .tix files land in a predictable location
+          export HPCTIXDIR="$(pwd)/dist-newstyle"
+          # Extract the unit-id of the library component from the plan
+          UNIT_ID=$(jq -r '.__"install-plan"[] | select(."pkg-name" == "minithesis" and ."component-name" == "lib") | ."id"' dist-newstyle/cache/plan.json 2>/dev/null || true)
+          if [ -z "$UNIT_ID" ]; then
+            # Fallback for standard jq (no __ quoting) on most runners
+            UNIT_ID=$(jq -r '."install-plan"[] | select(."pkg-name" == "minithesis" and ."component-name" == "lib") | ."id"' dist-newstyle/cache/plan.json)
+          fi
+          echo "Using cabal --coverage-for=${UNIT_ID}"
+          cabal test --enable-coverage --enable-per-component --coverage-for="${UNIT_ID}" --test-show-details=streaming
 
       - name: Cabal check
         run: cabal check
