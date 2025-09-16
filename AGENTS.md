@@ -9,8 +9,8 @@
 - Port the Python reference test suite incrementally, marking each Python test as `-- PORTED` once its Haskell counterpart exists.
 
 ## Formatting
-- Run Ormolu in-place on all tracked Haskell files:
-  `ormolu --mode inplace $(git ls-files '*.hs')`
-- If you prefer to stay inside the Cabal toolchain and have `ormolu` installed via Cabal, use:
+- Ormolu version: we use `ormolu-0.7.7.0` in CI. Install it locally once so results match:
+  `cabal install ormolu-0.7.7.0`
+- Run Ormolu in-place on all tracked Haskell files (explicit and CI-consistent):
   `cabal exec -- ormolu --mode inplace $(git ls-files '*.hs')`
-- As a convenience, `make format` wraps the same command.
+- `make format` runs the same command.
