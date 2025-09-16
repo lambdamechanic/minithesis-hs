@@ -18,3 +18,4 @@ Keep this document up to date as a living record of porting progress from the Py
 
 ## Ported Python Tests
 - ✅ test_errors_when_using_frozen
+- ✅ test_errors_on_too_large_choice

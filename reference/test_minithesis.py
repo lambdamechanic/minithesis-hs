@@ -312,7 +312,7 @@ def test_errors_when_using_frozen():  # -- PORTED
         tc.forced_choice(10)
 
 
-def test_errors_on_too_large_choice():
+def test_errors_on_too_large_choice():  # -- PORTED
     tc = TC.for_choices([0])
     with pytest.raises(ValueError):
         tc.choice(2 ** 64)
