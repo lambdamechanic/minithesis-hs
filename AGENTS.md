@@ -7,3 +7,10 @@
 - After each significant commit, push a suitably named branch and raise a PR.
 - The Haskell test suite must be written with Hspec while still providing runners for both Hspec and Tasty.
 - Port the Python reference test suite incrementally, marking each Python test as `-- PORTED` once its Haskell counterpart exists.
+
+## Formatting
+- Run Ormolu in-place on all tracked Haskell files:
+  `ormolu --mode inplace $(git ls-files '*.hs')`
+- If you prefer to stay inside the Cabal toolchain and have `ormolu` installed via Cabal, use:
+  `cabal exec -- ormolu --mode inplace $(git ls-files '*.hs')`
+- As a convenience, `make format` wraps the same command.
