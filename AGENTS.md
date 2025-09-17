@@ -5,6 +5,10 @@
 - Build and test exclusively with Cabal; Stack must not be introduced.
 - Before every commit, run linting, Ormolu formatting, `cabal test`, and `cabal check` locally.
 - After each significant commit, push a suitably named branch and raise a PR.
+- Branching policy: always ensure `main` is up to date before branching.
+  - Run `git fetch origin --prune && git checkout main && git pull --ff-only`.
+  - Then create your feature branch from `main` (e.g., `git checkout -b port/<topic>`).
+  - This avoids unnecessary rebases later.
 - The Haskell test suite must be written with Hspec while still providing runners for both Hspec and Tasty.
 - Port the Python reference test suite incrementally, marking each Python test as `-- PORTED` once its Haskell counterpart exists.
 

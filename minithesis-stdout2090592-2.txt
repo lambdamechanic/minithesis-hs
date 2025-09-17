@@ -1,0 +1,43 @@
+choice(1000): 933
+choice(1000): 785
+choice(10000): 672
+choice(1000): 0
+choice(1000): 785
+choice(10000): 672
+choice(1000): 1000
+choice(1000): 785
+choice(10000): 672
+choice(1000): 933
+choice(1000): 0
+choice(10000): 672
+choice(1000): 933
+choice(1000): 1000
+choice(10000): 672
+choice(1000): 933
+choice(1000): 785
+choice(10000): 0
+choice(1000): 933
+choice(1000): 785
+choice(10000): 10000
+  targeting when most do not benefit prints expected choices [✘]
+
+Failures:
+
+  test/Minithesis/Spec.hs:174:5: 
+  1) targeting can target a score upwards to interesting and prints choices
+       uncaught exception: Failure
+       Failure
+
+  To rerun use: --match "/targeting/can target a score upwards to interesting and prints choices/" --seed 1366120487
+
+  test/Minithesis/Spec.hs:185:5: 
+  2) targeting targeting when most do not benefit prints expected choices
+       uncaught exception: Failure
+       Failure
+
+  To rerun use: --match "/targeting/targeting when most do not benefit prints expected choices/" --seed 1366120487
+
+Randomized with seed 1366120487
+
+Finished in 0.0025 seconds
+24 examples, 2 failures

@@ -1,6 +1,6 @@
 module Minithesis.Spec (spec) where
 
-import Control.Exception (Exception, throwIO)
+import Control.Exception (Exception, throwIO, try)
 import Control.Monad (forM_, when)
 import Data.IORef
 import GHC.IO.Handle (hDuplicate, hDuplicateTo)
@@ -153,7 +153,7 @@ spec = do
   describe "targeting" $ do
     it "can target a score upwards without failing" $ do
       maxScoreRef <- newIORef (0 :: Integer)
-      let opts = defaultRunOptions {runQuiet = True, runMaxExamples = 200}
+      let opts = defaultRunOptions {runQuiet = True, runMaxExamples = 1000}
       runTest opts $ \tc -> do
         n <- choice tc 1000
         m <- choice tc 1000
@@ -171,6 +171,42 @@ spec = do
         target tc (negate (fromIntegral s))
         modifyIORef' minScoreRef (min s)
       readIORef minScoreRef `shouldReturn` 0
+    it "can target a score upwards to interesting and prints choices" $ do
+      let opts = defaultRunOptions {runQuiet = False, runMaxExamples = 1000}
+      (out, res) <-
+        captureStdout $
+          tryFailure
+            ( runTest opts $ \tc -> do
+                n <- choice tc 1000
+                m <- choice tc 1000
+                let s = toInteger n + toInteger m
+                target tc (fromIntegral s)
+                when (s == 2000) (throwIO Failure)
+            )
+      case res of
+        Left _ -> pure ()
+        Right _ -> expectationFailure "expected Failure"
+      let ls = filter (not . null) (lines out)
+      drop (length ls - 2) ls `shouldBe` ["choice(1000): 1000", "choice(1000): 1000"]
+    it "targeting when most do not benefit prints expected choices" $ do
+      let big = 10000 :: Integer
+          opts = defaultRunOptions {runQuiet = False, runMaxExamples = 1000}
+      (out, res2) <-
+        captureStdout $
+          tryFailure
+            ( runTest opts $ \tc -> do
+                _ <- choice tc 1000
+                _ <- choice tc 1000
+                score <- choice tc big
+                target tc (fromIntegral score)
+                when (toInteger score == big) (throwIO Failure)
+            )
+      case res2 of
+        Left _ -> pure ()
+        Right _ -> expectationFailure "expected Failure"
+      let ls2 = filter (not . null) (lines out)
+      drop (length ls2 - 3) ls2
+        `shouldBe` ["choice(1000): 0", "choice(1000): 0", "choice(" ++ show big ++ "): " ++ show big]
 
 isFrozen :: Frozen -> Bool
 isFrozen _ = True
@@ -188,6 +224,9 @@ instance Exception Failure
 
 isFailure :: Failure -> Bool
 isFailure _ = True
+
+tryFailure :: IO a -> IO (Either Failure a)
+tryFailure = try
 
 captureStdout :: IO a -> IO (String, a)
 captureStdout action = do

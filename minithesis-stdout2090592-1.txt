@@ -1,0 +1,19 @@
+choice(1000): 211
+choice(1000): 635
+choice(1000): 0
+choice(1000): 635
+choice(1000): 1000
+choice(1000): 635
+choice(1000): 211
+choice(1000): 0
+choice(1000): 211
+choice(1000): 1000
+choice(1000): 0
+choice(1000): 635
+choice(1000): 1000
+choice(1000): 635
+choice(1000): 1000
+choice(1000): 0
+choice(1000): 1000
+choice(1000): 1000
+  can target a score upwards to interesting and prints choices [✘]
