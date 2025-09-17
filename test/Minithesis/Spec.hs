@@ -3,12 +3,14 @@ module Minithesis.Spec (spec) where
 import Control.Exception (Exception, throwIO, try)
 import Control.Monad (forM_, replicateM, when)
 import Data.IORef
+import Data.List (isPrefixOf)
 import GHC.IO.Handle (hDuplicate, hDuplicateTo)
 import Minithesis
 import System.Directory (removeFile)
 import System.IO
 import Test.Hspec
 import Prelude hiding (any)
+import qualified Prelude as P (any)
 
 spec :: Spec
 spec = do
@@ -186,7 +188,7 @@ spec = do
       case res of
         Left _ -> pure ()
         Right _ -> expectationFailure "expected Failure"
-      let ls = filter (not . null) (lines out)
+      let ls = filterInterestingLines out
       drop (length ls - 2) ls `shouldBe` ["choice(1000): 1000", "choice(1000): 1000"]
     it "targeting when most do not benefit prints expected choices" $ do
       let big = 10000 :: Integer
@@ -204,7 +206,7 @@ spec = do
       case res2 of
         Left _ -> pure ()
         Right _ -> expectationFailure "expected Failure"
-      let ls2 = filter (not . null) (lines out)
+      let ls2 = filterInterestingLines out
       drop (length ls2 - 3) ls2
         `shouldBe` ["choice(1000): 0", "choice(1000): 0", "choice(" ++ show big ++ "): " ++ show big]
 
@@ -224,7 +226,7 @@ spec = do
         case res of
           Left _ -> pure ()
           Right _ -> expectationFailure "expected Failure"
-        let ls = filter (not . null) (lines out)
+        let ls = filterInterestingLines out
         last ls `shouldBe` "any(lists(integers(0, 10000))): [1001]"
 
     it "finds small list even with bad lists (PORTED)" $ do
@@ -251,7 +253,7 @@ spec = do
         case res of
           Left _ -> pure ()
           Right _ -> expectationFailure "expected Failure"
-        let ls = filter (not . null) (lines out)
+        let ls = filterInterestingLines out
         last ls `shouldBe` "any(bind(integers(0, 10))): [1001]"
 
     it "reduces additive pairs (PORTED)" $ do
@@ -268,8 +270,16 @@ spec = do
       case res of
         Left _ -> pure ()
         Right _ -> expectationFailure "expected Failure"
-      let ls = filter (not . null) (lines out)
+      let ls = filterInterestingLines out
       ls `shouldBe` ["choice(1000): 1", "choice(1000): 1000"]
+
+-- Keep only lines that originate from Minithesis value printing
+-- to avoid including test harness progress output.
+filterInterestingLines :: String -> [String]
+filterInterestingLines out =
+  let ls = lines out
+      ok l = P.any (`isPrefixOf` l) ["choice(", "any(", "weighted("]
+   in filter ok ls
 
 isFrozen :: Frozen -> Bool
 isFrozen _ = True
