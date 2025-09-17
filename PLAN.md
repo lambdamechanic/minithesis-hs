@@ -22,8 +22,12 @@ Keep this document up to date as a living record of porting progress from the Py
 - ✅ test_errors_on_too_large_choice
 - ✅ test_test_cases_satisfy_preconditions
 - ✅ test_error_on_too_strict_precondition
- - ✅ test_prints_a_top_level_weighted
- - ✅ test_impossible_weighted
+- ✅ test_prints_a_top_level_weighted
+- ✅ test_impossible_weighted
+ - ✅ test_guaranteed_weighted
+ - ✅ test_max_examples_is_not_exceeded
+ - ✅ test_forced_choice_bounds
+ - ✅ test_size_bounds_on_list
 
 ## Design Notes
 - Library module will be decomposed into `Minithesis.TestCase`, `Minithesis.State`, and generator modules as features land.
