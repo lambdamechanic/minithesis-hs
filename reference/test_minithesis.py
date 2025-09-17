@@ -287,7 +287,7 @@ def test_can_target_a_score_downwards(capsys):
     ]
 
 
-def test_prints_a_top_level_weighted(capsys):
+def test_prints_a_top_level_weighted(capsys):  # -- PORTED
     with pytest.raises(AssertionError):
 
         @run_test(database={}, max_examples=1000)
@@ -390,7 +390,7 @@ def test_target_and_reduce(capsys):
     assert captured.out.strip() == "choice(100000): 99901"
 
 
-def test_impossible_weighted():
+def test_impossible_weighted():  # -- PORTED
     with pytest.raises(Failure):
 
         @run_test(database={})
