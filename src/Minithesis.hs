@@ -369,7 +369,10 @@ updateTargeting state tc = do
                     | j <- [0 .. len - 1]
                     ]
                in replaced
-            extremes i = [0, bounds !! i]
+            extremes i =
+              let b = bounds !! i
+                  mid = b `div` 2
+               in [0, mid, b]
             muts = [genMut i e | i <- [0 .. len - 1], e <- extremes i]
         modifyIORef' (tsQueue state) (muts <>)
 
