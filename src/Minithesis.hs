@@ -566,10 +566,7 @@ satisfying (Strategy fa name mShow) p =
 sortKey :: [Word64] -> (Int, [Word64])
 sortKey xs = (length xs, xs)
 
-showEllipsis :: (Show a) => a -> String
-showEllipsis a =
-  let s = show a
-   in if length s > 12 then take 12 s ++ "…" else s
+-- Removed unused showEllipsis helper to avoid warnings.
 
 -- Targeted optimisation pass (adapted, simplified)
 targetOptimisation :: TestingState -> IO ()
@@ -590,8 +587,8 @@ targetOptimisation state = do
             _ -> False
     bestChoices <- readIORef (tsBestChoices state)
     forM_ [0 .. length bestChoices - 1] $ \i -> do
-      _ <- adjust bestChoices i 1
-      _ <- adjust bestChoices i (-1)
+      _ <- adjust bestChoices i (1 :: Integer)
+      _ <- adjust bestChoices i ((-1) :: Integer)
       pure ()
 
 replaceAt :: [a] -> Int -> a -> [a]
@@ -620,10 +617,16 @@ shrinkResult state = do
                           -- also reduce the first choice (commonly a size/length)
                           -- by up to k to keep structures like lists consistent.
                           let baseCand = take i best ++ drop (i + k) best
-                              len0 = if null best then 0 else fromIntegral (head best)
-                              dec = min k len0
-                              new0 = fromIntegral (len0 - dec)
-                              cand = if i > 0 && not (null best) then replaceAt baseCand 0 new0 else baseCand
+                              cand =
+                                if i > 0 && not (null best)
+                                  then
+                                    let len0 = case best of
+                                          [] -> 0
+                                          (x : _) -> fromIntegral x
+                                        dec = min k len0
+                                        new0 = fromIntegral (len0 - dec)
+                                     in replaceAt baseCand 0 new0
+                                  else baseCand
                           ok <- if i + k <= length best then consider cand else pure False
                           go (i - 1) (if ok then cand else best)
             foldM' xs [8, 7, 6, 5, 4, 3, 2, 1] tryK
@@ -693,7 +696,7 @@ foldM' z (x : xs) f = do
   foldM' z' xs f
 
 -- Binary search down to a local minimal v in [lo, hi] where predicate True
-binSearchDown :: (Integral a, Ord a) => a -> a -> (a -> IO Bool) -> IO a
+binSearchDown :: (Integral a) => a -> a -> (a -> IO Bool) -> IO a
 binSearchDown lo hi f = do
   okLo <- f lo
   if okLo
