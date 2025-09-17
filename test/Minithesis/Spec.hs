@@ -1,6 +1,5 @@
 module Minithesis.Spec (spec) where
 
-import Prelude hiding (any)
 import Control.Exception (Exception, throwIO)
 import Control.Monad (forM_, when)
 import Data.IORef
@@ -9,6 +8,7 @@ import Minithesis
 import System.Directory (removeFile)
 import System.IO
 import Test.Hspec
+import Prelude hiding (any)
 
 spec :: Spec
 spec = do

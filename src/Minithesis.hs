@@ -27,13 +27,13 @@ module Minithesis
   )
 where
 
-import Prelude hiding (any)
 import Control.Exception (Exception, throwIO, try)
 import Control.Monad (replicateM, unless, when)
 import Data.IORef
 import Data.Maybe (isJust)
 import Data.Word (Word64)
 import System.Random (StdGen, mkStdGen, newStdGen, randomR)
+import Prelude hiding (any)
 
 -- | Represents the outcome of executing a test case.
 -- Ordering matches the original Python IntEnum.
