@@ -609,14 +609,23 @@ shrinkResult state = do
             pure (st == Interesting)
           deleteChunks xs = do
             let tryK k cur = do
-                  let go i best =
-                        if i < 0
-                          then pure best
-                          else do
-                            let cand = take i best ++ drop (i + k) best
-                            ok <- if i + k <= length best then consider cand else pure False
-                            go (i - 1) (if ok then cand else best)
                   go (length cur - k - 1) cur
+                  where
+                    go i best =
+                      if i < 0
+                        then pure best
+                        else do
+                          -- Attempt to delete a window of size k starting at i.
+                          -- If we are deleting choices after the first index,
+                          -- also reduce the first choice (commonly a size/length)
+                          -- by up to k to keep structures like lists consistent.
+                          let baseCand = take i best ++ drop (i + k) best
+                              len0 = if null best then 0 else fromIntegral (head best)
+                              dec = min k len0
+                              new0 = fromIntegral (len0 - dec)
+                              cand = if i > 0 && not (null best) then replaceAt baseCand 0 new0 else baseCand
+                          ok <- if i + k <= length best then consider cand else pure False
+                          go (i - 1) (if ok then cand else best)
             foldM' xs [8, 7, 6, 5, 4, 3, 2, 1] tryK
           sortWindows xs = do
             let tryK k cur = do
@@ -656,11 +665,23 @@ shrinkResult state = do
                               else go (i - 1) best1
                   go (length cur - 1 - k) cur
             step 2 xs >>= step 1
+          -- Minimize each coordinate independently while preserving Interesting
+          minimizeEach xs = do
+            let go i best =
+                  if i < 0
+                    then pure best
+                    else do
+                      let hi = best !! i
+                      v <- binSearchDown 0 hi $ \v -> consider (replaceAt best i v)
+                      let cand = replaceAt best i v
+                      chooseIfTrue cand best >>= go (i - 1)
+            go (length xs - 1) xs
           loop prev = do
             improved1 <- deleteChunks prev
             improved2 <- sortWindows improved1
             improved3 <- redistributePairs improved2
-            if improved3 == prev then pure prev else loop improved3
+            improved4 <- minimizeEach improved3
+            if improved4 == prev then pure prev else loop improved4
       res <- loop res0
       writeIORef (tsResult state) (Just res)
 
