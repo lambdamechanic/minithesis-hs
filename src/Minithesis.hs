@@ -16,6 +16,7 @@ module Minithesis
     tuples,
     just,
     nothing,
+    satisfying,
     mixOf,
     TestCase,
     forChoices,
@@ -339,6 +340,22 @@ weighted tc p
 -- | Minimal strategy type for generator-based APIs.
 newtype Strategy a = Strategy {runStrategy :: TestCase -> IO a}
 
+instance Functor Strategy where
+  fmap f (Strategy g) = Strategy $ \tc -> f <$> g tc
+
+instance Applicative Strategy where
+  pure = just
+  Strategy ff <*> Strategy fa = Strategy $ \tc -> do
+    f <- ff tc
+    a <- fa tc
+    pure (f a)
+
+instance Monad Strategy where
+  Strategy fa >>= k = Strategy $ \tc -> do
+    a <- fa tc
+    let Strategy fb = k a
+    fb tc
+
 -- | Run a strategy to produce a value.
 any :: TestCase -> Strategy a -> IO a
 any tc (Strategy f) = f tc
@@ -384,3 +401,9 @@ mixOf xs = Strategy $ \tc -> do
   i <- choice tc (toInteger (n - 1))
   let Strategy f = xs !! fromIntegral i
   f tc
+
+-- | Filter a strategy with a predicate, rejecting values that do not satisfy it.
+satisfying :: Strategy a -> (a -> Bool) -> Strategy a
+satisfying (Strategy fa) p = Strategy $ \tc -> do
+  a <- fa tc
+  if p a then pure a else reject tc

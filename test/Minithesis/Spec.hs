@@ -103,6 +103,24 @@ spec = do
       runTest opts $ \tc -> do
         ls <- any tc (lists (integers 0 10) (Just 1) (Just 3))
         length ls `shouldSatisfy` (\n -> n >= 1 && n <= 3)
+    it "mapped possibility" $ do
+      let opts = defaultRunOptions {runQuiet = True}
+      runTest opts $ \tc -> do
+        v <- any tc (fmap (\n -> n * 2) (integers 0 5))
+        v `shouldSatisfy` (\n -> n `mod` 2 == 0)
+    it "selected possibility" $ do
+      let opts = defaultRunOptions {runQuiet = True}
+      runTest opts $ \tc -> do
+        v <- any tc (satisfying (integers 0 5) (\n -> n `mod` 2 == 0))
+        v `shouldSatisfy` (\n -> n `mod` 2 == 0)
+    it "bound possibility" $ do
+      let opts = defaultRunOptions {runQuiet = True}
+      runTest opts $ \tc -> do
+        (m, n) <- any tc $ do
+          m <- integers 0 5
+          tuples (just m) (integers m (m + 10))
+        m `shouldSatisfy` (\x -> x >= 0 && x <= 5)
+        n `shouldSatisfy` (\x -> x >= m && x <= m + 10)
     it "tuples combines strategies" $ do
       let opts = defaultRunOptions {runQuiet = True}
       runTest opts $ \tc -> do
