@@ -38,13 +38,13 @@ Keep this document up to date as a living record of porting progress from the Py
  - ✅ test_can_target_a_score_downwards
  - ✅ test_can_choose_full_64_bits
  - ✅ test_error_on_unbounded_test_function
- - ✅ test_can_target_a_score_upwards_to_interesting
- - ✅ test_targeting_when_most_do_not_benefit
+- ✅ test_can_target_a_score_upwards_to_interesting
+- ✅ test_targeting_when_most_do_not_benefit
+- ✅ test_reduces_additive_pairs
+- ✅ test_reuses_results_from_the_database
+- ✅ test_function_cache
 
 ## Missing Python Tests To Port
-- test_reduces_additive_pairs
-- test_reuses_results_from_the_database
-- test_function_cache
 - test_finds_a_local_maximum
 - test_target_and_reduce
 

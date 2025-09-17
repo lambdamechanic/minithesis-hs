@@ -265,6 +265,28 @@ spec = do
         Right _ -> expectationFailure "expected Failure"
       linesOut `shouldBe` ["choice(1000): 1", "choice(1000): 1000"]
 
+  describe "caching" $ do
+    it "matches Python's test_function_cache" $ do
+      callsRef <- newIORef (0 :: Int)
+      cache <- cachedTestFunction $ \tc -> do
+        modifyIORef' callsRef (+ 1)
+        v <- choice tc 1000
+        when (v >= 200) (markStatus tc Interesting)
+        w <- choice tc 1
+        when (w == 0) (reject tc)
+      let expectStatus choices =
+            case choices of
+              [1, 1] -> Valid
+              [1] -> Overrun
+              [1000] -> Interesting
+              [1000, 1] -> Interesting
+              _ -> error "unexpected choice sequence"
+          sequences = [[1, 1], [1], [1000], [1000], [1000, 1]]
+      forM_ sequences $ \bs -> do
+        st <- cache bs
+        st `shouldBe` expectStatus bs
+      readIORef callsRef `shouldReturn` 2
+
 collectOutput :: RunOptions -> (RunOptions -> IO a) -> IO ([String], a)
 collectOutput baseOpts action = do
   ref <- newIORef []
