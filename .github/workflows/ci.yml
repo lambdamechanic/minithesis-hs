@@ -57,6 +57,8 @@ jobs:
           cabal build all --enable-tests --enable-per-component
 
       - name: Run tests with coverage-for library only
+        env:
+          HSPEC_OPTIONS: "--no-color"
         run: |
           set -euo pipefail
           # Ensure .tix files land in a predictable location

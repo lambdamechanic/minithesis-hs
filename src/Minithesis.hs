@@ -13,6 +13,9 @@ module Minithesis
     any,
     integers,
     lists,
+    tuples,
+    just,
+    nothing,
     TestCase,
     forChoices,
     newTestCase,
@@ -330,6 +333,8 @@ weighted tc p
           printIfNeeded tc $ "weighted(" ++ show p ++ "): " ++ show res
           pure res
 
+-- Generators
+
 -- | Minimal strategy type for generator-based APIs.
 newtype Strategy a = Strategy {runStrategy :: TestCase -> IO a}
 
@@ -354,3 +359,18 @@ lists (Strategy elemS) minSize maxSize = Strategy $ \tc -> do
   k <- choice tc spanN
   let len = lo + fromIntegral k
   replicateM len (elemS tc)
+
+-- | Pair strategy combining two strategies.
+tuples :: Strategy a -> Strategy b -> Strategy (a, b)
+tuples (Strategy fa) (Strategy fb) = Strategy $ \tc -> do
+  a <- fa tc
+  b <- fb tc
+  pure (a, b)
+
+-- | Constant strategy.
+just :: a -> Strategy a
+just x = Strategy $ \_ -> pure x
+
+-- | Strategy that always rejects, forcing Unsatisfiable at the run level.
+nothing :: Strategy a
+nothing = Strategy $ \tc -> reject tc
