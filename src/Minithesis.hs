@@ -33,11 +33,13 @@ module Minithesis
   )
 where
 
-import Control.Exception (Exception, throwIO, try)
-import Control.Monad (replicateM, unless, when)
+import Control.Exception (Exception, SomeException, throwIO, try)
+import Control.Monad (forM_, replicateM, unless, when)
 import Data.IORef
-import Data.Maybe (fromMaybe, isJust)
+import qualified Data.List as L
+import Data.Maybe (fromMaybe, isJust, isNothing)
 import Data.Word (Word64)
+import qualified System.IO.Unsafe as Unsafe
 import System.Random (StdGen, mkStdGen, newStdGen, randomR)
 import Prelude hiding (any)
 
@@ -121,7 +123,9 @@ data TestingState
     tsBestScore :: IORef (Maybe Double),
     tsBestChoices :: IORef [Word64],
     tsBestBounds :: IORef [Integer],
-    tsQueue :: IORef [[Word64]]
+    tsQueue :: IORef [[Word64]],
+    tsResult :: IORef (Maybe [Word64]),
+    tsTrivial :: IORef Bool
   }
 
 bufferSize :: Int
@@ -140,6 +144,8 @@ runTest opts userFunction = do
   bestChoicesRef <- newIORef []
   bestBoundsRef <- newIORef []
   queueRef <- newIORef []
+  resultRef <- newIORef Nothing
+  trivialRef <- newIORef False
   let state =
         TestingState
           { tsRandom = randomRef,
@@ -150,18 +156,37 @@ runTest opts userFunction = do
             tsBestScore = bestScoreRef,
             tsBestChoices = bestChoicesRef,
             tsBestBounds = bestBoundsRef,
-            tsQueue = queueRef
+            tsQueue = queueRef,
+            tsResult = resultRef,
+            tsTrivial = trivialRef
           }
   runGeneration state
+  -- optional targeted optimisation step similar to Python's TestingState.target
+  targetOptimisation state
+  -- shrinking step if we found an interesting example
+  shrinkResult state
+  -- Post conditions: if no valid cases, unsatisfiable
+  valid <- readIORef (tsValid state)
+  when (valid == 0) $ throwIO Unsatisfiable
+  -- If we found an interesting result, replay it to raise the user's error and print values
+  mRes <- readIORef (tsResult state)
+  case mRes of
+    Nothing -> pure ()
+    Just choices -> do
+      tc <- forChoices choices (not (runQuiet opts))
+      -- Replay without catching user exceptions so they propagate
+      userFunction tc
 
 runGeneration :: TestingState -> IO ()
 runGeneration state = do
+  res <- readIORef (tsResult state)
   valid <- readIORef (tsValid state)
-  if valid >= runMaxExamples (tsOptions state)
+  calls <- readIORef (tsCalls state)
+  trivial <- readIORef (tsTrivial state)
+  let opts = tsOptions state
+  if isJust res || valid >= runMaxExamples opts || calls >= callLimit opts || trivial
     then pure ()
     else do
-      calls <- readIORef (tsCalls state)
-      when (calls >= callLimit (tsOptions state)) $ throwIO Unsatisfiable
       prefixQueue <- readIORef (tsQueue state)
       let (prefixToUse, restQ) = case prefixQueue of
             [] -> ([], [])
@@ -179,10 +204,31 @@ runGeneration state = do
 executeTestCase :: TestingState -> TestCase -> IO Status
 executeTestCase state testCase = do
   modifyIORef' (tsCalls state) (+ 1)
-  _ <- try (tsTestFunction state testCase) :: IO (Either StopTest ())
+  r <- try (tsTestFunction state testCase) :: IO (Either SomeException ())
+  case r of
+    Left _ -> do
+      m <- getStatus testCase
+      case m of
+        Nothing -> do
+          _ <- try (markStatus testCase Interesting) :: IO (Either StopTest a)
+          pure ()
+        Just _ -> pure ()
+    Right _ -> pure ()
   status <- finaliseStatus testCase
   when (status >= Valid) $ modifyIORef' (tsValid state) (+ 1)
+  -- If the test case was invalid or overrun with no choices, mark test as trivial
+  when (status >= Invalid) $ do
+    choices <- getChoices testCase
+    when (null choices) (writeIORef (tsTrivial state) True)
   updateTargeting state testCase
+  when (status == Interesting) $ do
+    -- Record best interesting example by shortlex order
+    mBest <- readIORef (tsResult state)
+    choices <- getChoices testCase
+    let better a b = sortKey a < sortKey b
+    case mBest of
+      Nothing -> writeIORef (tsResult state) (Just choices)
+      Just prev -> when (better choices prev) (writeIORef (tsResult state) (Just choices))
   pure status
 
 finaliseStatus :: TestCase -> IO Status
@@ -398,73 +444,295 @@ weighted tc p
 
 -- Generators
 
--- | Minimal strategy type for generator-based APIs.
-newtype Strategy a = Strategy {runStrategy :: TestCase -> IO a}
+-- | Minimal strategy type with a name for printing.
+data Strategy a = Strategy
+  { runStrategy :: TestCase -> IO a,
+    strategyName :: String,
+    strategyShow :: Maybe (a -> String)
+  }
 
 instance Functor Strategy where
-  fmap f (Strategy g) = Strategy (fmap f . g)
+  fmap f (Strategy g n _) = Strategy (fmap f . g) ("map(" ++ n ++ ")") Nothing
 
 instance Applicative Strategy where
   pure = just
-  Strategy ff <*> Strategy fa = Strategy $ \tc -> do
-    f <- ff tc
-    a <- fa tc
-    pure (f a)
+  Strategy ff nf _ <*> Strategy fa na _ =
+    Strategy
+      ( \tc -> do
+          f <- ff tc
+          a <- fa tc
+          pure (f a)
+      )
+      ("ap(" ++ nf ++ "," ++ na ++ ")")
+      Nothing
 
 instance Monad Strategy where
-  Strategy fa >>= k = Strategy $ \tc -> do
-    a <- fa tc
-    let Strategy fb = k a
-    fb tc
+  Strategy fa na _ >>= k =
+    Strategy
+      ( \tc -> do
+          a <- fa tc
+          let Strategy fb _ _ = k a
+          fb tc
+      )
+      ("bind(" ++ na ++ ")")
+      Nothing
 
 -- | Run a strategy to produce a value.
 any :: TestCase -> Strategy a -> IO a
-any tc (Strategy f) = f tc
+any tc (Strategy f name mShow) = do
+  modifyIORef' (tcDepth tc) (+ 1)
+  result <- f tc
+  modifyIORef' (tcDepth tc) (\d -> d - 1)
+  case mShow of
+    Just sh -> printIfNeeded tc $ "any(" ++ name ++ "): " ++ sh result
+    Nothing -> pure ()
+  pure result
 
 -- | Integer strategy drawing from inclusive bounds [lo, hi].
 integers :: Integer -> Integer -> Strategy Integer
-integers lo hi = Strategy $ \tc -> do
-  when (hi < lo) $ throwIO (ValueError $ "Invalid integer bounds [" ++ show lo ++ "," ++ show hi ++ "]")
-  let spanN = hi - lo
-  v <- choice tc spanN
-  pure (lo + toInteger v)
+integers lo hi =
+  Strategy
+    ( \tc -> do
+        when (hi < lo) $ throwIO (ValueError $ "Invalid integer bounds [" ++ show lo ++ "," ++ show hi ++ "]")
+        let spanN = hi - lo
+        v <- choice tc spanN
+        pure (lo + toInteger v)
+    )
+    ("integers(" ++ show lo ++ ", " ++ show hi ++ ")")
+    (Just show)
 
 -- | List strategy with optional size bounds.
-lists :: Strategy a -> Maybe Int -> Maybe Int -> Strategy [a]
-lists (Strategy elemS) minSize maxSize = Strategy $ \tc -> do
-  let lo = max 0 (fromMaybe 0 minSize)
-      hi = max lo (fromMaybe (lo + 10) maxSize) -- default modest max
-      spanN = fromIntegral (hi - lo) :: Integer
-  k <- choice tc spanN
-  let len = lo + fromIntegral k
-  replicateM len (elemS tc)
+lists :: (Show a) => Strategy a -> Maybe Int -> Maybe Int -> Strategy [a]
+lists (Strategy elemS name _) minSize maxSize =
+  Strategy
+    ( \tc -> do
+        let lo = max 0 (fromMaybe 0 minSize)
+            hi = max lo (fromMaybe (lo + 10) maxSize) -- default modest max
+            spanN = fromIntegral (hi - lo) :: Integer
+        k <- choice tc spanN
+        let len = lo + fromIntegral k
+        replicateM len (elemS tc)
+    )
+    ("lists(" ++ name ++ ")")
+    (Just show)
 
 -- | Pair strategy combining two strategies.
 tuples :: Strategy a -> Strategy b -> Strategy (a, b)
-tuples (Strategy fa) (Strategy fb) = Strategy $ \tc -> do
-  a <- fa tc
-  b <- fb tc
-  pure (a, b)
+tuples (Strategy fa na _) (Strategy fb nb _) =
+  Strategy
+    ( \tc -> do
+        a <- fa tc
+        b <- fb tc
+        pure (a, b)
+    )
+    ("tuples(" ++ na ++ "," ++ nb ++ ")")
+    Nothing
 
 -- | Constant strategy.
 just :: a -> Strategy a
-just x = Strategy $ \_ -> pure x
+just x = Strategy (\_ -> pure x) "just" Nothing
 
 -- | Strategy that always rejects, forcing Unsatisfiable at the run level.
 nothing :: Strategy a
-nothing = Strategy $ \tc -> reject tc
+nothing = Strategy reject "nothing" Nothing
 
 -- | Choose from a non-empty list of strategies. Empty list rejects.
 mixOf :: [Strategy a] -> Strategy a
 mixOf [] = nothing
-mixOf xs = Strategy $ \tc -> do
-  let n = length xs
-  i <- choice tc (toInteger (n - 1))
-  let Strategy f = xs !! fromIntegral i
-  f tc
+mixOf xs =
+  Strategy
+    ( \tc -> do
+        let n = length xs
+        i <- choice tc (toInteger (n - 1))
+        let Strategy f _ _ = xs !! fromIntegral i
+        f tc
+    )
+    ("mixOf [" ++ L.intercalate "," (map strategyName xs) ++ "]")
+    Nothing
 
 -- | Filter a strategy with a predicate, rejecting values that do not satisfy it.
 satisfying :: Strategy a -> (a -> Bool) -> Strategy a
-satisfying (Strategy fa) p = Strategy $ \tc -> do
-  a <- fa tc
-  if p a then pure a else reject tc
+satisfying (Strategy fa name mShow) p =
+  Strategy
+    ( \tc -> do
+        a <- fa tc
+        if p a then pure a else reject tc
+    )
+    ("satisfying(" ++ name ++ ")")
+    mShow
+
+-- Utilities
+
+sortKey :: [Word64] -> (Int, [Word64])
+sortKey xs = (length xs, xs)
+
+-- Removed unused showEllipsis helper to avoid warnings.
+
+-- Targeted optimisation pass (adapted, simplified)
+targetOptimisation :: TestingState -> IO ()
+targetOptimisation state = do
+  mScore <- readIORef (tsBestScore state)
+  mRes <- readIORef (tsResult state)
+  when (isNothing mRes && isJust mScore) $ do
+    let adjust choices i step = do
+          let j = fromIntegral i
+          let new = replaceAt choices j (fromIntegral (fromIntegral (choices !! j) + step))
+          tc <- forChoices new False
+          _ <- executeTestCase state tc
+          st <- getStatus tc
+          sc <- readIORef (tcTargetingScore tc)
+          pure $ case (st, sc, mScore) of
+            (Just Valid, Just scv, Just best) -> scv > best
+            (Just Valid, Just scv, Nothing) -> scv >= 0
+            _ -> False
+    bestChoices <- readIORef (tsBestChoices state)
+    forM_ [0 .. length bestChoices - 1] $ \i -> do
+      _ <- adjust bestChoices i (1 :: Integer)
+      _ <- adjust bestChoices i ((-1) :: Integer)
+      pure ()
+
+replaceAt :: [a] -> Int -> a -> [a]
+replaceAt xs i v = take i xs ++ [v] ++ drop (i + 1) xs
+
+-- Shrinker (subset sufficient for current tests)
+shrinkResult :: TestingState -> IO ()
+shrinkResult state = do
+  mRes <- readIORef (tsResult state)
+  case mRes of
+    Nothing -> pure ()
+    Just res0 -> do
+      let consider cand = do
+            st <- cachedEvaluate state cand
+            pure (st == Interesting)
+          deleteChunks xs = do
+            let tryK k cur = do
+                  go (length cur - k - 1) cur
+                  where
+                    go i best =
+                      if i < 0
+                        then pure best
+                        else do
+                          -- Attempt to delete a window of size k starting at i.
+                          -- If we are deleting choices after the first index,
+                          -- also reduce the first choice (commonly a size/length)
+                          -- by up to k to keep structures like lists consistent.
+                          let baseCand = take i best ++ drop (i + k) best
+                              cand =
+                                if i > 0 && not (null best)
+                                  then
+                                    let len0 = case best of
+                                          [] -> 0
+                                          (x : _) -> fromIntegral x
+                                        dec = min k len0
+                                        new0 = fromIntegral (len0 - dec)
+                                     in replaceAt baseCand 0 new0
+                                  else baseCand
+                          ok <- if i + k <= length best then consider cand else pure False
+                          go (i - 1) (if ok then cand else best)
+            foldM' xs [8, 7, 6, 5, 4, 3, 2, 1] tryK
+          sortWindows xs = do
+            let tryK k cur = do
+                  let go i best =
+                        if i < 0
+                          then pure best
+                          else do
+                            let seg = take k (drop i best)
+                                cand = take i best ++ L.sort seg ++ drop (i + k) best
+                            ok <- consider cand
+                            go (i - 1) (if ok then cand else best)
+                  go (length cur - k - 1) cur
+            foldM' xs [8, 7 .. 2] tryK
+          chooseIfTrue cand best = do
+            ok <- consider cand
+            pure (if ok then cand else best)
+          redistributePairs xs = do
+            let step k cur = do
+                  let go i best =
+                        if i + k >= length best || i < 0
+                          then pure best
+                          else do
+                            let j = i + k
+                                a = best !! i
+                                b = best !! j
+                                swapCand = replaceAt (replaceAt best i b) j a
+                            best1 <- if a > b then chooseIfTrue swapCand best else pure best
+                            let a' = best1 !! i
+                                b' = best1 !! j
+                            if a' > 0
+                              then do
+                                v <- binSearchDown 0 a' $ \v -> do
+                                  let cand = replaceAt (replaceAt best1 i v) j (b' + (a' - v))
+                                  consider cand
+                                let cand = replaceAt (replaceAt best1 i v) j (b' + (a' - v))
+                                chooseIfTrue cand best1 >>= go (i - 1)
+                              else go (i - 1) best1
+                  go (length cur - 1 - k) cur
+            step 2 xs >>= step 1
+          -- Minimize each coordinate independently while preserving Interesting
+          minimizeEach xs = do
+            let go i best =
+                  if i < 0
+                    then pure best
+                    else do
+                      let hi = best !! i
+                      v <- binSearchDown 0 hi $ \v -> consider (replaceAt best i v)
+                      let cand = replaceAt best i v
+                      chooseIfTrue cand best >>= go (i - 1)
+            go (length xs - 1) xs
+          loop prev = do
+            improved1 <- deleteChunks prev
+            improved2 <- sortWindows improved1
+            improved3 <- redistributePairs improved2
+            improved4 <- minimizeEach improved3
+            if improved4 == prev then pure prev else loop improved4
+      res <- loop res0
+      writeIORef (tsResult state) (Just res)
+
+-- Simple foldM specialized to this module to avoid extra imports
+foldM' :: (Monad m) => a -> [b] -> (b -> a -> m a) -> m a
+foldM' z [] _ = pure z
+foldM' z (x : xs) f = do
+  z' <- f x z
+  foldM' z' xs f
+
+-- Binary search down to a local minimal v in [lo, hi] where predicate True
+binSearchDown :: (Integral a) => a -> a -> (a -> IO Bool) -> IO a
+binSearchDown lo hi f = do
+  okLo <- f lo
+  if okLo
+    then pure lo
+    else go lo hi
+  where
+    go l h
+      | l + 1 >= h = pure h
+      | otherwise = do
+          let mid = l + (h - l) `div` 2
+          ok <- f mid
+          if ok then go l mid else go mid h
+
+-- Cached evaluator of a choice sequence against the current test function
+{-# NOINLINE evalCache #-}
+evalCache :: IORef [([Word64], Status)]
+evalCache = Unsafe.unsafePerformIO (newIORef [])
+
+cachedEvaluate :: TestingState -> [Word64] -> IO Status
+cachedEvaluate state choices = do
+  cache <- readIORef evalCache
+  case lookup choices cache of
+    Just st -> pure st
+    Nothing -> do
+      tc <- forChoices choices False
+      -- Run and capture status; catch exceptions and mark interesting if needed
+      r <- try (tsTestFunction state tc) :: IO (Either SomeException ())
+      case r of
+        Left _ -> do
+          m <- getStatus tc
+          case m of
+            Nothing -> do
+              _ <- try (markStatus tc Interesting) :: IO (Either StopTest a)
+              pure ()
+            Just _ -> pure ()
+        Right _ -> pure ()
+      st <- finaliseStatus tc
+      modifyIORef' evalCache ((choices, st) :)
+      pure st
