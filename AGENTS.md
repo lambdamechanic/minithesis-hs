@@ -4,6 +4,10 @@
 - Use GitHub CI with `haskell-actions/setup` v2 and cache Cabal with the latest `actions/cache` release.
 - Build and test exclusively with Cabal; Stack must not be introduced.
 - Before every commit, run linting, Ormolu formatting, `cabal test`, and `cabal check` locally.
+  - `make format`
+  - `hlint $(git ls-files '*.hs')`
+  - `cabal test all --test-show-details=direct`
+  - `cabal check`
 - After each significant commit, push a suitably named branch and raise a PR.
 - Branching policy: always ensure `main` is up to date before branching.
   - Run `git fetch origin --prune && git checkout main && git pull --ff-only`.

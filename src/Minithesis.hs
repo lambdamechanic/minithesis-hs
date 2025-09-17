@@ -251,8 +251,8 @@ forChoices prefix printResults =
   forChoicesWithPrinter prefix printResults putStrLn
 
 forChoicesWithPrinter :: [Word64] -> Bool -> (String -> IO ()) -> IO TestCase
-forChoicesWithPrinter prefix printResults printer =
-  newTestCaseWith prefix Nothing (Just (length prefix)) printResults printer
+forChoicesWithPrinter prefix =
+  newTestCaseWith prefix Nothing (Just (length prefix))
 
 -- | Construct a fresh test case backed by an RNG.
 newTestCase :: StdGen -> Int -> Bool -> IO TestCase
@@ -701,17 +701,13 @@ shrinkResult state = do
             go 0 xs
           -- Prefer canonicalizing two-element additive pairs to lexicographic
           -- minimal form when possible, e.g. (2,999) -> (1,1000).
-          normalizePair best = do
-            if length best >= 2
-              then do
-                let a = best !! 0
-                    b = best !! 1
-                if a > 0
-                  then do
+          normalizePair best =
+            case best of
+              a : b : _
+                | a > 0 -> do
                     let cand = replaceAt (replaceAt best 0 1) 1 (b + (a - 1))
                     chooseIfTrue cand best
-                  else pure best
-              else pure best
+              _ -> pure best
           loop prev = do
             improved1 <- deleteChunks prev
             improved2 <- sortWindows improved1

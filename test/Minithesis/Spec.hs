@@ -151,13 +151,16 @@ spec = do
         m `shouldSatisfy` (\x -> (x >= -5 && x <= 0) || (x >= 2 && x <= 5))
         m `shouldSatisfy` (/= (1 :: Integer))
   describe "targeting" $ do
+    let drawTwo tc = do
+          n <- choice tc 1000
+          m <- choice tc 1000
+          let s = toInteger n + toInteger m
+          pure (n, m, s)
     it "can target a score upwards without failing" $ do
       maxScoreRef <- newIORef (0 :: Integer)
       let opts = defaultRunOptions {runQuiet = True, runMaxExamples = 1000, runSeed = Just 0}
       runTest opts $ \tc -> do
-        n <- choice tc 1000
-        m <- choice tc 1000
-        let s = toInteger n + toInteger m
+        (_, _, s) <- drawTwo tc
         target tc (fromIntegral s)
         modifyIORef' maxScoreRef (max s)
       readIORef maxScoreRef `shouldReturn` 2000
@@ -165,9 +168,7 @@ spec = do
       minScoreRef <- newIORef (100000 :: Integer)
       let opts = defaultRunOptions {runQuiet = True, runMaxExamples = 200}
       runTest opts $ \tc -> do
-        n <- choice tc 1000
-        m <- choice tc 1000
-        let s = toInteger n + toInteger m
+        (_, _, s) <- drawTwo tc
         target tc (negate (fromIntegral s))
         modifyIORef' minScoreRef (min s)
       readIORef minScoreRef `shouldReturn` 0
@@ -177,9 +178,7 @@ spec = do
         collectOutput baseOpts $ \opts ->
           tryFailure
             ( runTest opts $ \tc -> do
-                n <- choice tc 1000
-                m <- choice tc 1000
-                let s = toInteger n + toInteger m
+                (_, _, s) <- drawTwo tc
                 target tc (fromIntegral s)
                 when (s == 2000) (throwIO Failure)
             )
