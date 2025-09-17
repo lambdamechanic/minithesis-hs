@@ -8,6 +8,13 @@
 - The Haskell test suite must be written with Hspec while still providing runners for both Hspec and Tasty.
 - Port the Python reference test suite incrementally, marking each Python test as `-- PORTED` once its Haskell counterpart exists.
 
+## Formatting
+- Ormolu version: we use `ormolu-0.7.7.0` in CI. Install it locally once so results match:
+  `cabal install ormolu-0.7.7.0`
+- Run Ormolu in-place on all tracked Haskell files (explicit and CI-consistent):
+  `cabal exec -- ormolu --mode inplace $(git ls-files '*.hs')`
+- `make format` runs the same command.
+
 ### Red/Green Push Policy
 - Always separate failing tests and the fix into two pushes on the same PR:
   - First push: add one or more failing test(s) that demonstrate the bug or missing behavior. Push this commit so CI reports the red build.

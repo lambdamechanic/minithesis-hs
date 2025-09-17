@@ -1,5 +1,6 @@
 CABAL ?= cabal
-ORMOLU ?= ormolu
+# Use the Cabal-installed ormolu explicitly for consistency with CI
+ORMOLU ?= $(CABAL) exec -- ormolu
 HLINT ?= hlint
 HS_SOURCES := $(shell git ls-files --cached --others --exclude-standard -- '*.hs')
 

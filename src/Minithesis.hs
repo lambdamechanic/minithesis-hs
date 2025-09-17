@@ -40,8 +40,8 @@ data Status
 -- | Exception raised when operations occur on a completed test case.
 newtype Frozen
   = Frozen
-      { frozenReason :: String
-      }
+  { frozenReason :: String
+  }
   deriving (Show)
 
 instance Exception Frozen
@@ -49,8 +49,8 @@ instance Exception Frozen
 -- | Exception used internally to short circuit test execution.
 newtype StopTest
   = StopTest
-      { stopReason :: Status
-      }
+  { stopReason :: Status
+  }
   deriving (Show)
 
 instance Exception StopTest
@@ -69,15 +69,15 @@ instance Exception Unsatisfiable
 
 data TestCase
   = TestCase
-      { tcPrefix :: [Word64],
-        tcRandom :: Maybe (IORef StdGen),
-        tcMaxSize :: Maybe Int,
-        tcChoices :: IORef [Word64],
-        tcStatus :: IORef (Maybe Status),
-        tcPrintResults :: Bool,
-        tcDepth :: IORef Int,
-        tcTargetingScore :: IORef (Maybe Integer)
-      }
+  { tcPrefix :: [Word64],
+    tcRandom :: Maybe (IORef StdGen),
+    tcMaxSize :: Maybe Int,
+    tcChoices :: IORef [Word64],
+    tcStatus :: IORef (Maybe Status),
+    tcPrintResults :: Bool,
+    tcDepth :: IORef Int,
+    tcTargetingScore :: IORef (Maybe Integer)
+  }
 
 data RunOptions
   = RunOptions
