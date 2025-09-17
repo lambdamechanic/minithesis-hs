@@ -324,21 +324,21 @@ def test_can_choose_full_64_bits():
         tc.choice(2 ** 64 - 1)
 
 
-def test_mapped_possibility():
+def test_mapped_possibility():  # -- PORTED
     @run_test()
     def _(tc):
         n = tc.any(integers(0, 5).map(lambda n: n * 2))
         assert n % 2 == 0
 
 
-def test_selected_possibility():
+def test_selected_possibility():  # -- PORTED
     @run_test()
     def _(tc):
         n = tc.any(integers(0, 5).satisfying(lambda n: n % 2 == 0))
         assert n % 2 == 0
 
 
-def test_bound_possibility():
+def test_bound_possibility():  # -- PORTED
     @run_test()
     def _(tc):
         m, n = tc.any(
