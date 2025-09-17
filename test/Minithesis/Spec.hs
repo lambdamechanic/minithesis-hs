@@ -106,13 +106,13 @@ spec = do
     it "mapped possibility" $ do
       let opts = defaultRunOptions {runQuiet = True}
       runTest opts $ \tc -> do
-        v <- any tc (fmap (\n -> n * 2) (integers 0 5))
-        v `shouldSatisfy` (\n -> n `mod` 2 == 0)
+        v <- any tc (fmap (* 2) (integers 0 5))
+        v `shouldSatisfy` even
     it "selected possibility" $ do
       let opts = defaultRunOptions {runQuiet = True}
       runTest opts $ \tc -> do
-        v <- any tc (satisfying (integers 0 5) (\n -> n `mod` 2 == 0))
-        v `shouldSatisfy` (\n -> n `mod` 2 == 0)
+        v <- any tc (satisfying (integers 0 5) even)
+        v `shouldSatisfy` even
     it "bound possibility" $ do
       let opts = defaultRunOptions {runQuiet = True}
       runTest opts $ \tc -> do

@@ -341,7 +341,7 @@ weighted tc p
 newtype Strategy a = Strategy {runStrategy :: TestCase -> IO a}
 
 instance Functor Strategy where
-  fmap f (Strategy g) = Strategy $ \tc -> f <$> g tc
+  fmap f (Strategy g) = Strategy (fmap f . g)
 
 instance Applicative Strategy where
   pure = just
