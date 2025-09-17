@@ -37,7 +37,7 @@ import Control.Exception (Exception, SomeException, throwIO, try)
 import Control.Monad (forM_, replicateM, unless, when)
 import Data.IORef
 import qualified Data.List as L
-import Data.Maybe (fromMaybe, isJust)
+import Data.Maybe (fromMaybe, isJust, isNothing)
 import Data.Word (Word64)
 import qualified System.IO.Unsafe as Unsafe
 import System.Random (StdGen, mkStdGen, newStdGen, randomR)
@@ -184,7 +184,7 @@ runGeneration state = do
   calls <- readIORef (tsCalls state)
   trivial <- readIORef (tsTrivial state)
   let opts = tsOptions state
-  if res /= Nothing || valid >= runMaxExamples opts || calls >= callLimit opts || trivial
+  if isJust res || valid >= runMaxExamples opts || calls >= callLimit opts || trivial
     then pure ()
     else do
       prefixQueue <- readIORef (tsQueue state)
@@ -534,7 +534,7 @@ just x = Strategy (\_ -> pure x) "just" Nothing
 
 -- | Strategy that always rejects, forcing Unsatisfiable at the run level.
 nothing :: Strategy a
-nothing = Strategy (\tc -> reject tc) "nothing" Nothing
+nothing = Strategy reject "nothing" Nothing
 
 -- | Choose from a non-empty list of strategies. Empty list rejects.
 mixOf :: [Strategy a] -> Strategy a
@@ -576,7 +576,7 @@ targetOptimisation :: TestingState -> IO ()
 targetOptimisation state = do
   mScore <- readIORef (tsBestScore state)
   mRes <- readIORef (tsResult state)
-  when (mRes == Nothing && mScore /= Nothing) $ do
+  when (isNothing mRes && isJust mScore) $ do
     let adjust choices i step = do
           let j = fromIntegral i
           let new = replaceAt choices j (fromIntegral (fromIntegral (choices !! j) + step))
