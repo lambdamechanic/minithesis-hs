@@ -29,6 +29,7 @@ module Minithesis
     setStatus,
     getStatus,
     getChoices,
+    target,
   )
 where
 
@@ -85,10 +86,11 @@ data TestCase
     tcRandom :: Maybe (IORef StdGen),
     tcMaxSize :: Maybe Int,
     tcChoices :: IORef [Word64],
+    tcBounds :: IORef [Integer],
     tcStatus :: IORef (Maybe Status),
     tcPrintResults :: Bool,
     tcDepth :: IORef Int,
-    tcTargetingScore :: IORef (Maybe Integer)
+    tcTargetingScore :: IORef (Maybe Double)
   }
 
 data RunOptions
@@ -115,7 +117,11 @@ data TestingState
     tsOptions :: RunOptions,
     tsTestFunction :: TestCase -> IO (),
     tsValid :: IORef Int,
-    tsCalls :: IORef Int
+    tsCalls :: IORef Int,
+    tsBestScore :: IORef (Maybe Double),
+    tsBestChoices :: IORef [Word64],
+    tsBestBounds :: IORef [Integer],
+    tsQueue :: IORef [[Word64]]
   }
 
 bufferSize :: Int
@@ -130,13 +136,21 @@ runTest opts userFunction = do
   randomRef <- newIORef initialGen
   validRef <- newIORef 0
   callsRef <- newIORef 0
+  bestScoreRef <- newIORef Nothing
+  bestChoicesRef <- newIORef []
+  bestBoundsRef <- newIORef []
+  queueRef <- newIORef []
   let state =
         TestingState
           { tsRandom = randomRef,
             tsOptions = opts,
             tsTestFunction = userFunction,
             tsValid = validRef,
-            tsCalls = callsRef
+            tsCalls = callsRef,
+            tsBestScore = bestScoreRef,
+            tsBestChoices = bestChoicesRef,
+            tsBestBounds = bestBoundsRef,
+            tsQueue = queueRef
           }
   runGeneration state
 
@@ -148,9 +162,14 @@ runGeneration state = do
     else do
       calls <- readIORef (tsCalls state)
       when (calls >= callLimit (tsOptions state)) $ throwIO Unsatisfiable
+      prefixQueue <- readIORef (tsQueue state)
+      let (prefixToUse, restQ) = case prefixQueue of
+            [] -> ([], [])
+            (p : ps) -> (p, ps)
+      writeIORef (tsQueue state) restQ
       testCase <-
         newTestCaseWith
-          []
+          prefixToUse
           (Just (tsRandom state))
           (Just (runBufferSize (tsOptions state)))
           (not (runQuiet (tsOptions state)))
@@ -163,6 +182,7 @@ executeTestCase state testCase = do
   _ <- try (tsTestFunction state testCase) :: IO (Either StopTest ())
   status <- finaliseStatus testCase
   when (status >= Valid) $ modifyIORef' (tsValid state) (+ 1)
+  updateTargeting state testCase
   pure status
 
 finaliseStatus :: TestCase -> IO Status
@@ -188,6 +208,7 @@ newTestCase gen maxSize printResults = do
 newTestCaseWith :: [Word64] -> Maybe (IORef StdGen) -> Maybe Int -> Bool -> IO TestCase
 newTestCaseWith prefix randomRef maxSize printResults = do
   choicesRef <- newIORef []
+  boundsRef <- newIORef []
   statusRef <- newIORef Nothing
   depthRef <- newIORef 0
   targetingRef <- newIORef Nothing
@@ -197,6 +218,7 @@ newTestCaseWith prefix randomRef maxSize printResults = do
         tcRandom = randomRef,
         tcMaxSize = maxSize,
         tcChoices = choicesRef,
+        tcBounds = boundsRef,
         tcStatus = statusRef,
         tcPrintResults = printResults,
         tcDepth = depthRef,
@@ -256,6 +278,7 @@ prepareChoice tc n = do
   validateBound n
   ensureMutable tc
   ensureCapacity tc
+  modifyIORef' (tcBounds tc) (<> [n])
 
 validateBound :: Integer -> IO ()
 validateBound n
@@ -311,6 +334,34 @@ printIfNeeded :: TestCase -> String -> IO ()
 printIfNeeded tc message = do
   depth <- readIORef (tcDepth tc)
   when (tcPrintResults tc && depth == 0) $ putStrLn message
+
+-- | Record a targeting score for the current test case.
+target :: TestCase -> Double -> IO ()
+target tc score = writeIORef (tcTargetingScore tc) (Just score)
+
+-- Internal: capture best score/choices and enqueue mutations
+updateTargeting :: TestingState -> TestCase -> IO ()
+updateTargeting state tc = do
+  mScore <- readIORef (tcTargetingScore tc)
+  case mScore of
+    Nothing -> pure ()
+    Just sc -> do
+      best <- readIORef (tsBestScore state)
+      choices <- readIORef (tcChoices tc)
+      bounds <- readIORef (tcBounds tc)
+      let improve = maybe True (sc >) best
+      when improve $ do
+        writeIORef (tsBestScore state) (Just sc)
+        writeIORef (tsBestChoices state) choices
+        writeIORef (tsBestBounds state) bounds
+        let len = min (length choices) (length bounds)
+            genMut idx extreme =
+              let pre = take len choices
+                  replaced = take idx pre <> [fromInteger extreme] <> drop (idx + 1) pre
+               in replaced
+            extremes i = [0, bounds !! i]
+            muts = [genMut i e | i <- [0 .. len - 1], e <- extremes i]
+        modifyIORef' (tsQueue state) (<> muts)
 
 -- | Draw a boolean that is True with the given probability in [0, 1].
 -- If the test case is deterministic (no RNG), this returns False for 0 < p < 1.

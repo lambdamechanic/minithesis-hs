@@ -150,6 +150,27 @@ spec = do
         m <- any tc (mixOf [integers (-5) 0, integers 2 5])
         m `shouldSatisfy` (\x -> (x >= -5 && x <= 0) || (x >= 2 && x <= 5))
         m `shouldSatisfy` (/= (1 :: Integer))
+  describe "targeting" $ do
+    it "can target a score upwards without failing" $ do
+      maxScoreRef <- newIORef (0 :: Integer)
+      let opts = defaultRunOptions {runQuiet = True, runMaxExamples = 200}
+      runTest opts $ \tc -> do
+        n <- choice tc 1000
+        m <- choice tc 1000
+        let s = toInteger n + toInteger m
+        target tc (fromIntegral s)
+        modifyIORef' maxScoreRef (max s)
+      readIORef maxScoreRef `shouldReturn` 2000
+    it "can target a score downwards" $ do
+      minScoreRef <- newIORef (100000 :: Integer)
+      let opts = defaultRunOptions {runQuiet = True, runMaxExamples = 200}
+      runTest opts $ \tc -> do
+        n <- choice tc 1000
+        m <- choice tc 1000
+        let s = toInteger n + toInteger m
+        target tc (negate (fromIntegral s))
+        modifyIORef' minScoreRef (min s)
+      readIORef minScoreRef `shouldReturn` 0
 
 isFrozen :: Frozen -> Bool
 isFrozen _ = True

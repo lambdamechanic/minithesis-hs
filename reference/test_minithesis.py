@@ -232,7 +232,7 @@ def test_can_target_a_score_upwards_to_interesting(capsys):
     ]
 
 
-def test_can_target_a_score_upwards_without_failing():
+def test_can_target_a_score_upwards_without_failing():  # -- PORTED
     max_score = 0
 
     @run_test(database={}, max_examples=1000)
@@ -268,7 +268,7 @@ def test_targeting_when_most_do_not_benefit(capsys):
     ]
 
 
-def test_can_target_a_score_downwards(capsys):
+def test_can_target_a_score_downwards(capsys):  # -- PORTED
     with pytest.raises(AssertionError):
 
         @run_test(database={}, max_examples=1000)

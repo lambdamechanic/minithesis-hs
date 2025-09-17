@@ -28,12 +28,14 @@ Keep this document up to date as a living record of porting progress from the Py
  - ✅ test_max_examples_is_not_exceeded
  - ✅ test_forced_choice_bounds
  - ✅ test_size_bounds_on_list
- - ✅ test_cannot_witness_nothing
-- ✅ test_cannot_witness_empty_mix_of
-- ✅ test_can_draw_mixture
+- ✅ test_cannot_witness_nothing
+ - ✅ test_cannot_witness_empty_mix_of
+ - ✅ test_can_draw_mixture
  - ✅ test_mapped_possibility
  - ✅ test_selected_possibility
  - ✅ test_bound_possibility
+ - ✅ test_can_target_a_score_upwards_without_failing
+ - ✅ test_can_target_a_score_downwards
 
 ## Design Notes
 - Library module will be decomposed into `Minithesis.TestCase`, `Minithesis.State`, and generator modules as features land.
