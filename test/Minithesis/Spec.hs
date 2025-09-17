@@ -39,6 +39,20 @@ spec = do
                     loop
                in loop
       action `shouldThrow` isUnsatisfiable
+    it "satisfies preconditions when using assume" $ do
+      let opts = defaultRunOptions {runQuiet = True}
+      runTest opts $ \tc -> do
+        n <- choice tc 9
+        assume tc (n /= 0)
+        n `shouldSatisfy` (/= 0)
+    it "raises Unsatisfiable when all test cases are rejected" $ do
+      let opts = defaultRunOptions {runQuiet = True}
+          action =
+            runTest opts $ \tc -> do
+              _ <- choice tc 9
+              assume tc False
+      action `shouldThrow` isUnsatisfiable
+
   describe "weighted" $ do
     it "prints a top-level weighted" $ do
       tc <- forChoices [] True
@@ -64,6 +78,7 @@ spec = do
               b <- weighted tc 1.0
               when b $ throwIO Failure
       action `shouldThrow` isFailure
+
   describe "limits" $ do
     it "does not exceed max_examples" $ do
       let runs = [1, 2, 5, 10]
@@ -71,35 +86,39 @@ spec = do
         calls <- newIORef (0 :: Int)
         let opts = defaultRunOptions {runQuiet = True, runMaxExamples = mx}
         runTest opts $ \tc -> do
-          -- a couple of choices to simulate work
           _ <- choice tc 10000
           _ <- choice tc 10000
-          -- one call per test case invocation
           s <- readIORef calls
           writeIORef calls (s + 1)
         readIORef calls `shouldReturn` mx
+
   describe "TestCase.forcedChoice" $ do
     it "rejects bounds that exceed 64 bits" $ do
       tc <- forChoices [] False
       forcedChoice tc (2 ^ (64 :: Integer)) `shouldThrow` isValueError
+
   describe "generators" $ do
     it "size bounds on list" $ do
       let opts = defaultRunOptions {runQuiet = True}
       runTest opts $ \tc -> do
         ls <- any tc (lists (integers 0 10) (Just 1) (Just 3))
         length ls `shouldSatisfy` (\n -> n >= 1 && n <= 3)
-    it "satisfies preconditions when using assume" $ do
+    it "tuples combines strategies" $ do
       let opts = defaultRunOptions {runQuiet = True}
       runTest opts $ \tc -> do
-        n <- choice tc 9
-        assume tc (n /= 0)
-        n `shouldSatisfy` (/= 0)
-    it "raises Unsatisfiable when all test cases are rejected" $ do
+        (a, b) <- any tc (tuples (integers 0 10) (integers 0 10))
+        a `shouldSatisfy` (\x -> x >= 0 && x <= 10)
+        b `shouldSatisfy` (\x -> x >= 0 && x <= 10)
+    it "just wraps a constant value" $ do
       let opts = defaultRunOptions {runQuiet = True}
-          action =
-            runTest opts $ \tc -> do
-              _ <- choice tc 9
-              assume tc False
+      runTest opts $ \tc -> do
+        v <- any tc (just (42 :: Integer))
+        v `shouldBe` 42
+    it "nothing fails when forced" $ do
+      let opts = defaultRunOptions {runQuiet = True, runMaxExamples = 5}
+          action = runTest opts $ \tc -> do
+            _ <- any tc nothing
+            pure ()
       action `shouldThrow` isUnsatisfiable
 
 isFrozen :: Frozen -> Bool
