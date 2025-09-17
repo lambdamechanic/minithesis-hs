@@ -16,6 +16,7 @@ module Minithesis
     tuples,
     just,
     nothing,
+    mixOf,
     TestCase,
     forChoices,
     newTestCase,
@@ -374,3 +375,12 @@ just x = Strategy $ \_ -> pure x
 -- | Strategy that always rejects, forcing Unsatisfiable at the run level.
 nothing :: Strategy a
 nothing = Strategy $ \tc -> reject tc
+
+-- | Choose from a non-empty list of strategies. Empty list rejects.
+mixOf :: [Strategy a] -> Strategy a
+mixOf [] = nothing
+mixOf xs = Strategy $ \tc -> do
+  let n = length xs
+  i <- choice tc (toInteger (n - 1))
+  let Strategy f = xs !! fromIntegral i
+  f tc
