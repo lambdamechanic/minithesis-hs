@@ -208,6 +208,25 @@ spec = do
       drop (length ls2 - 3) ls2
         `shouldBe` ["choice(1000): 0", "choice(1000): 0", "choice(" ++ show big ++ "): " ++ show big]
 
+  describe "shrinking" $ do
+    it "finds small list (port of test_finds_small_list)" $ do
+      -- Expect the minimal failing list to be [1001] and printed via any(...)
+      forM_ [0 .. (9 :: Int)] $ \seed -> do
+        let opts = defaultRunOptions {runQuiet = False, runMaxExamples = 200, runSeed = Just seed}
+        (out, res) <-
+          captureStdout $
+            tryFailure
+              ( runTest opts $ \tc -> do
+                  ls <- any tc (lists (integers 0 10000) Nothing Nothing)
+                  let s = sum ls
+                  when (s > 1000) (throwIO Failure)
+              )
+        case res of
+          Left _ -> pure ()
+          Right _ -> expectationFailure "expected Failure"
+        let ls = filter (not . null) (lines out)
+        last ls `shouldBe` "any(lists(integers(0, 10000))): [1001]"
+
 isFrozen :: Frozen -> Bool
 isFrozen _ = True
 

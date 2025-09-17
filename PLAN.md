@@ -37,6 +37,23 @@ Keep this document up to date as a living record of porting progress from the Py
  - ✅ test_can_target_a_score_upwards_without_failing
  - ✅ test_can_target_a_score_downwards
  - ✅ test_can_choose_full_64_bits
+ - ✅ test_error_on_unbounded_test_function
+ - ✅ test_can_target_a_score_upwards_to_interesting
+ - ✅ test_targeting_when_most_do_not_benefit
+
+## Missing Python Tests To Port
+- test_finds_small_list
+- test_finds_small_list_even_with_bad_lists
+- test_reduces_additive_pairs
+- test_reuses_results_from_the_database
+- test_function_cache
+- test_finds_a_local_maximum
+- test_target_and_reduce
+
+## Dropped Reference Tests
+- test_give_minithesis_a_workout
+- test_failure_from_hypothesis_1
+- test_failure_from_hypothesis_2
 
 ## Design Notes
 - Library module will be decomposed into `Minithesis.TestCase`, `Minithesis.State`, and generator modules as features land.
