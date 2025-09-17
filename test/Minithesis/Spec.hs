@@ -153,6 +153,8 @@ isFailure _ = True
 captureStdout :: IO a -> IO (String, a)
 captureStdout action = do
   -- Save original stdout
+  -- Flush any buffered progress output from the test runner before redirect
+  hFlush stdout
   oldStdout <- hDuplicate stdout
   hSetBuffering stdout LineBuffering
   (path, h) <- openTempFile "." "minithesis-stdout.txt"
