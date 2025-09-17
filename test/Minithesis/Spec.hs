@@ -58,6 +58,24 @@ spec = do
               v <- choice tc 1
               when (v == 1) (throwIO Failure)
       action `shouldThrow` isFailure
+  describe "limits" $ do
+    it "does not exceed max_examples" $ do
+      let runs = [1, 2, 5, 10]
+      forM_ runs $ \mx -> do
+        calls <- newIORef (0 :: Int)
+        let opts = defaultRunOptions {runQuiet = True, runMaxExamples = mx}
+        runTest opts $ \tc -> do
+          -- a couple of choices to simulate work
+          _ <- choice tc 10000
+          _ <- choice tc 10000
+          -- one call per test case invocation
+          s <- readIORef calls
+          writeIORef calls (s + 1)
+        readIORef calls `shouldReturn` mx
+  describe "TestCase.forcedChoice" $ do
+    it "rejects bounds that exceed 64 bits" $ do
+      tc <- forChoices [] False
+      forcedChoice tc (2 ^ (64 :: Integer)) `shouldThrow` isValueError
     it "satisfies preconditions when using assume" $ do
       let opts = defaultRunOptions {runQuiet = True}
       runTest opts $ \tc -> do

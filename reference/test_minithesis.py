@@ -177,7 +177,7 @@ def test_function_cache():
 
 
 @pytest.mark.parametrize("max_examples", range(1, 100))
-def test_max_examples_is_not_exceeded(max_examples):
+def test_max_examples_is_not_exceeded(max_examples):  # -- PORTED
     """Targeting has a number of places it checks for
     whether we've exceeded the generation limits. This
     makes sure we've checked them all.
@@ -403,7 +403,7 @@ def test_impossible_weighted():  # -- PORTED
                 raise Failure()
 
 
-def test_guaranteed_weighted():
+def test_guaranteed_weighted():  # -- PORTED
     with pytest.raises(Failure):
 
         @run_test(database={})
@@ -422,7 +422,7 @@ def test_size_bounds_on_list():
         assert 1 <= len(ls) <= 3
 
 
-def test_forced_choice_bounds():
+def test_forced_choice_bounds():  # -- PORTED
     with pytest.raises(ValueError):
 
         @run_test(database={})
