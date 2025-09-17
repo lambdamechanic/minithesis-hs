@@ -349,6 +349,7 @@ updateTargeting state tc = do
       best <- readIORef (tsBestScore state)
       choices <- readIORef (tcChoices tc)
       bounds <- readIORef (tcBounds tc)
+      bestChoices <- readIORef (tsBestChoices state)
       let improve = maybe True (sc >) best
       when improve $ do
         writeIORef (tsBestScore state) (Just sc)
@@ -357,11 +358,20 @@ updateTargeting state tc = do
         let len = min (length choices) (length bounds)
             genMut idx extreme =
               let pre = take len choices
-                  replaced = take idx pre <> [fromInteger extreme] <> drop (idx + 1) pre
+                  bestPre j = if j < length bestChoices then bestChoices !! j else 0
+                  replaced =
+                    [ if j < idx
+                        then bestPre j
+                        else
+                          if j == idx
+                            then fromInteger extreme
+                            else pre !! j
+                    | j <- [0 .. len - 1]
+                    ]
                in replaced
             extremes i = [0, bounds !! i]
             muts = [genMut i e | i <- [0 .. len - 1], e <- extremes i]
-        modifyIORef' (tsQueue state) (<> muts)
+        modifyIORef' (tsQueue state) (muts <>)
 
 -- | Draw a boolean that is True with the given probability in [0, 1].
 -- If the test case is deterministic (no RNG), this returns False for 0 < p < 1.
