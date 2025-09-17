@@ -34,10 +34,11 @@ jobs:
       - name: Install tooling
         run: |
           cabal install \
+            --ignore-project \
             --installdir="$HOME/.cabal/bin" \
             --overwrite-policy=always \
             ormolu-0.7.7.0 \
-            hlint
+            hlint-3.10
 
       - name: Ormolu formatting check
         run: |
@@ -50,7 +51,7 @@ jobs:
         run: |
           files=$(git ls-files '*.hs')
           if [ -n "$files" ]; then
-            hlint $files
+            cabal exec -- hlint $files
           fi
 
       - name: Build (per-component)
