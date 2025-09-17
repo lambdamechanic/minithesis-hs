@@ -8,6 +8,11 @@ module Minithesis
     defaultRunOptions,
     runTest,
     weighted,
+    -- Generators
+    Strategy,
+    any,
+    integers,
+    lists,
     TestCase,
     forChoices,
     newTestCase,
@@ -22,8 +27,9 @@ module Minithesis
   )
 where
 
+import Prelude hiding (any)
 import Control.Exception (Exception, throwIO, try)
-import Control.Monad (unless, when)
+import Control.Monad (replicateM, unless, when)
 import Data.IORef
 import Data.Maybe (isJust)
 import Data.Word (Word64)
@@ -323,3 +329,28 @@ weighted tc p
           writeIORef ref nextGen
           printIfNeeded tc $ "weighted(" ++ show p ++ "): " ++ show res
           pure res
+
+-- | Minimal strategy type for generator-based APIs.
+newtype Strategy a = Strategy {runStrategy :: TestCase -> IO a}
+
+-- | Run a strategy to produce a value.
+any :: TestCase -> Strategy a -> IO a
+any tc (Strategy f) = f tc
+
+-- | Integer strategy drawing from inclusive bounds [lo, hi].
+integers :: Integer -> Integer -> Strategy Integer
+integers lo hi = Strategy $ \tc -> do
+  when (hi < lo) $ throwIO (ValueError $ "Invalid integer bounds [" ++ show lo ++ "," ++ show hi ++ "]")
+  let spanN = hi - lo
+  v <- choice tc spanN
+  pure (lo + toInteger v)
+
+-- | List strategy with optional size bounds.
+lists :: Strategy a -> Maybe Int -> Maybe Int -> Strategy [a]
+lists (Strategy elemS) minSize maxSize = Strategy $ \tc -> do
+  let lo = max 0 (maybe 0 id minSize)
+      hi = max lo (maybe (lo + 10) id maxSize) -- default modest max
+      spanN = fromIntegral (hi - lo) :: Integer
+  k <- choice tc spanN
+  let len = lo + fromIntegral k
+  replicateM len (elemS tc)

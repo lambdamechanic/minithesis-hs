@@ -1,5 +1,6 @@
 module Minithesis.Spec (spec) where
 
+import Prelude hiding (any)
 import Control.Exception (Exception, throwIO)
 import Control.Monad (forM_, when)
 import Data.IORef
@@ -83,6 +84,12 @@ spec = do
     it "rejects bounds that exceed 64 bits" $ do
       tc <- forChoices [] False
       forcedChoice tc (2 ^ (64 :: Integer)) `shouldThrow` isValueError
+  describe "generators" $ do
+    it "size bounds on list" $ do
+      let opts = defaultRunOptions {runQuiet = True}
+      runTest opts $ \tc -> do
+        ls <- any tc (lists (integers 0 10) (Just 1) (Just 3))
+        length ls `shouldSatisfy` (\n -> n >= 1 && n <= 3)
     it "satisfies preconditions when using assume" $ do
       let opts = defaultRunOptions {runQuiet = True}
       runTest opts $ \tc -> do
