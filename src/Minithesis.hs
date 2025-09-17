@@ -81,10 +81,10 @@ data TestCase
 
 data RunOptions
   = RunOptions
-      { runMaxExamples :: Int,
-        runQuiet :: Bool,
-        runSeed :: Maybe Int
-      }
+  { runMaxExamples :: Int,
+    runQuiet :: Bool,
+    runSeed :: Maybe Int
+  }
   deriving (Eq, Show)
 
 defaultRunOptions :: RunOptions
@@ -97,12 +97,12 @@ defaultRunOptions =
 
 data TestingState
   = TestingState
-      { tsRandom :: IORef StdGen,
-        tsOptions :: RunOptions,
-        tsTestFunction :: TestCase -> IO (),
-        tsValid :: IORef Int,
-        tsCalls :: IORef Int
-      }
+  { tsRandom :: IORef StdGen,
+    tsOptions :: RunOptions,
+    tsTestFunction :: TestCase -> IO (),
+    tsValid :: IORef Int,
+    tsCalls :: IORef Int
+  }
 
 bufferSize :: Int
 bufferSize = 8 * 1024
