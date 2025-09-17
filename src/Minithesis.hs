@@ -7,6 +7,7 @@ module Minithesis
     RunOptions (..),
     defaultRunOptions,
     runTest,
+    weighted,
     TestCase,
     forChoices,
     newTestCase,
@@ -299,3 +300,26 @@ printIfNeeded :: TestCase -> String -> IO ()
 printIfNeeded tc message = do
   depth <- readIORef (tcDepth tc)
   when (tcPrintResults tc && depth == 0) $ putStrLn message
+
+-- | Draw a boolean that is True with the given probability in [0, 1].
+-- If the test case is deterministic (no RNG), this returns False for 0 < p < 1.
+weighted :: TestCase -> Double -> IO Bool
+weighted tc p
+  | p <= 0 = do
+      printIfNeeded tc $ "weighted(" ++ show p ++ "): False"
+      pure False
+  | p >= 1 = do
+      printIfNeeded tc $ "weighted(" ++ show p ++ "): True"
+      pure True
+  | otherwise =
+      case tcRandom tc of
+        Nothing -> do
+          printIfNeeded tc $ "weighted(" ++ show p ++ "): False"
+          pure False
+        Just ref -> do
+          gen <- readIORef ref
+          let (x, nextGen) = randomR (0.0, 1.0 :: Double) gen
+              res = x < p
+          writeIORef ref nextGen
+          printIfNeeded tc $ "weighted(" ++ show p ++ "): " ++ show res
+          pure res
