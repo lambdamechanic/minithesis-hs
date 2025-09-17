@@ -14,3 +14,8 @@
 - Run Ormolu in-place on all tracked Haskell files (explicit and CI-consistent):
   `cabal exec -- ormolu --mode inplace $(git ls-files '*.hs')`
 - `make format` runs the same command.
+
+### Red/Green Push Policy
+- Always separate failing tests and the fix into two pushes on the same PR:
+  - First push: add one or more failing test(s) that demonstrate the bug or missing behavior. Push this commit so CI reports the red build.
+  - Second push: add the implementation/fix so the same PR goes green. Keep both commits in the PR history (do not squash away the failing test commit).

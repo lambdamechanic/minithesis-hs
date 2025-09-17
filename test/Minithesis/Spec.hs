@@ -16,9 +16,26 @@ spec = do
     it "rejects bounds that exceed 64 bits" $ do
       tc <- forChoices [] False
       choice tc (2 ^ (64 :: Integer)) `shouldThrow` isValueError
+  describe "runTest" $ do
+    it "satisfies preconditions when using assume" $ do
+      let opts = defaultRunOptions {runQuiet = True}
+      runTest opts $ \tc -> do
+        n <- choice tc 9
+        assume tc (n /= 0)
+        n `shouldSatisfy` (/= 0)
+    it "raises Unsatisfiable when all test cases are rejected" $ do
+      let opts = defaultRunOptions {runQuiet = True}
+          action =
+            runTest opts $ \tc -> do
+              _ <- choice tc 9
+              assume tc False
+      action `shouldThrow` isUnsatisfiable
 
 isFrozen :: Frozen -> Bool
 isFrozen _ = True
 
 isValueError :: ValueError -> Bool
 isValueError _ = True
+
+isUnsatisfiable :: Unsatisfiable -> Bool
+isUnsatisfiable _ = True

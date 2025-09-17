@@ -3,11 +3,17 @@ module Minithesis
     Frozen (..),
     StopTest (..),
     ValueError (..),
+    Unsatisfiable (..),
+    RunOptions (..),
+    defaultRunOptions,
+    runTest,
     TestCase,
     forChoices,
     newTestCase,
     choice,
     forcedChoice,
+    reject,
+    assume,
     markStatus,
     setStatus,
     getStatus,
@@ -15,12 +21,12 @@ module Minithesis
   )
 where
 
-import Control.Exception (Exception, throwIO)
-import Control.Monad (when)
+import Control.Exception (Exception, throwIO, try)
+import Control.Monad (unless, when)
 import Data.IORef
 import Data.Maybe (isJust)
 import Data.Word (Word64)
-import System.Random (StdGen, randomR)
+import System.Random (StdGen, mkStdGen, newStdGen, randomR)
 
 -- | Represents the outcome of executing a test case.
 -- Ordering matches the original Python IntEnum.
@@ -55,6 +61,12 @@ newtype ValueError = ValueError String
 
 instance Exception ValueError
 
+-- | Raised when a property has no satisfying examples.
+data Unsatisfiable = Unsatisfiable
+  deriving (Eq, Show)
+
+instance Exception Unsatisfiable
+
 data TestCase
   = TestCase
   { tcPrefix :: [Word64],
@@ -67,6 +79,82 @@ data TestCase
     tcTargetingScore :: IORef (Maybe Integer)
   }
 
+data RunOptions
+  = RunOptions
+  { runMaxExamples :: Int,
+    runQuiet :: Bool,
+    runSeed :: Maybe Int
+  }
+  deriving (Eq, Show)
+
+defaultRunOptions :: RunOptions
+defaultRunOptions =
+  RunOptions
+    { runMaxExamples = 100,
+      runQuiet = False,
+      runSeed = Nothing
+    }
+
+data TestingState
+  = TestingState
+  { tsRandom :: IORef StdGen,
+    tsOptions :: RunOptions,
+    tsTestFunction :: TestCase -> IO (),
+    tsValid :: IORef Int,
+    tsCalls :: IORef Int
+  }
+
+bufferSize :: Int
+bufferSize = 8 * 1024
+
+callLimit :: RunOptions -> Int
+callLimit opts = runMaxExamples opts * 10
+
+runTest :: RunOptions -> (TestCase -> IO ()) -> IO ()
+runTest opts userFunction = do
+  initialGen <- maybe newStdGen (pure . mkStdGen) (runSeed opts)
+  randomRef <- newIORef initialGen
+  validRef <- newIORef 0
+  callsRef <- newIORef 0
+  let state =
+        TestingState
+          { tsRandom = randomRef,
+            tsOptions = opts,
+            tsTestFunction = userFunction,
+            tsValid = validRef,
+            tsCalls = callsRef
+          }
+  runGeneration state
+
+runGeneration :: TestingState -> IO ()
+runGeneration state = do
+  valid <- readIORef (tsValid state)
+  if valid >= runMaxExamples (tsOptions state)
+    then pure ()
+    else do
+      calls <- readIORef (tsCalls state)
+      when (calls >= callLimit (tsOptions state)) $ throwIO Unsatisfiable
+      testCase <- newTestCaseWith [] (Just (tsRandom state)) (Just bufferSize) (not (runQuiet (tsOptions state)))
+      _ <- executeTestCase state testCase
+      runGeneration state
+
+executeTestCase :: TestingState -> TestCase -> IO Status
+executeTestCase state testCase = do
+  modifyIORef' (tsCalls state) (+ 1)
+  _ <- try (tsTestFunction state testCase) :: IO (Either StopTest ())
+  status <- finaliseStatus testCase
+  when (status >= Valid) $ modifyIORef' (tsValid state) (+ 1)
+  pure status
+
+finaliseStatus :: TestCase -> IO Status
+finaliseStatus testCase = do
+  current <- readIORef (tcStatus testCase)
+  case current of
+    Nothing -> do
+      writeIORef (tcStatus testCase) (Just Valid)
+      pure Valid
+    Just status -> pure status
+
 -- | Construct a deterministic test case that replays the supplied choices.
 forChoices :: [Word64] -> Bool -> IO TestCase
 forChoices prefix =
@@ -74,12 +162,12 @@ forChoices prefix =
 
 -- | Construct a fresh test case backed by an RNG.
 newTestCase :: StdGen -> Int -> Bool -> IO TestCase
-newTestCase gen maxSize =
-  newTestCaseWith [] (Just gen) (Just maxSize)
+newTestCase gen maxSize printResults = do
+  randomRef <- newIORef gen
+  newTestCaseWith [] (Just randomRef) (Just maxSize) printResults
 
-newTestCaseWith :: [Word64] -> Maybe StdGen -> Maybe Int -> Bool -> IO TestCase
-newTestCaseWith prefix randomSource maxSize printResults = do
-  randomRef <- traverse newIORef randomSource
+newTestCaseWith :: [Word64] -> Maybe (IORef StdGen) -> Maybe Int -> Bool -> IO TestCase
+newTestCaseWith prefix randomRef maxSize printResults = do
   choicesRef <- newIORef []
   statusRef <- newIORef Nothing
   depthRef <- newIORef 0
@@ -110,6 +198,16 @@ forcedChoice tc n = do
   let value = fromInteger n
   appendChoice tc value
   pure value
+
+-- | Reject the current test case as invalid.
+reject :: TestCase -> IO a
+reject tc = markStatus tc Invalid
+
+-- | Abort the current test case when the precondition is false.
+assume :: TestCase -> Bool -> IO ()
+assume tc condition = unless condition $ do
+  _ <- reject tc
+  pure ()
 
 -- | Mark the status of the test case and abort execution.
 markStatus :: TestCase -> Status -> IO a

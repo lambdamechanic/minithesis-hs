@@ -11,7 +11,7 @@ Keep this document up to date as a living record of porting progress from the Py
 
 ## Next Actions
 - Remember to run `make format` (Ormolu) before committing to avoid CI failures.
-- Map Python modules/tests to planned Haskell modules and capture design decisions.
+- ✅ Map Python modules/tests to planned Haskell modules and capture design decisions.
 - Implement the foundational testing state (e.g., `run_test`, `TestingState`) in Haskell.
 - Port generator-driven tests (starting with `test_finds_small_list`) once the runtime pieces exist.
 - Capture learnings in PLAN.md after each milestone and update CI/tooling if needs emerge.
@@ -20,3 +20,9 @@ Keep this document up to date as a living record of porting progress from the Py
 ## Ported Python Tests
 - ✅ test_errors_when_using_frozen
 - ✅ test_errors_on_too_large_choice
+- ✅ test_test_cases_satisfy_preconditions
+- ✅ test_error_on_too_strict_precondition
+
+## Design Notes
+- Library module will be decomposed into `Minithesis.TestCase`, `Minithesis.State`, and generator modules as features land.
+- Hspec specs mirror `reference/test_minithesis.py`; keep sections aligned with their Python counterparts.
