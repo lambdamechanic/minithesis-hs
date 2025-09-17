@@ -42,8 +42,6 @@ Keep this document up to date as a living record of porting progress from the Py
  - ✅ test_targeting_when_most_do_not_benefit
 
 ## Missing Python Tests To Port
-- test_finds_small_list
-- test_finds_small_list_even_with_bad_lists
 - test_reduces_additive_pairs
 - test_reuses_results_from_the_database
 - test_function_cache

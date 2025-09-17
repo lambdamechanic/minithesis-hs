@@ -1,7 +1,7 @@
 module Minithesis.Spec (spec) where
 
 import Control.Exception (Exception, throwIO, try)
-import Control.Monad (forM_, when)
+import Control.Monad (forM_, replicateM, when)
 import Data.IORef
 import GHC.IO.Handle (hDuplicate, hDuplicateTo)
 import Minithesis
@@ -151,13 +151,16 @@ spec = do
         m `shouldSatisfy` (\x -> (x >= -5 && x <= 0) || (x >= 2 && x <= 5))
         m `shouldSatisfy` (/= (1 :: Integer))
   describe "targeting" $ do
+    let drawTwo tc = do
+          n <- choice tc 1000
+          m <- choice tc 1000
+          let s = toInteger n + toInteger m
+          pure (n, m, s)
     it "can target a score upwards without failing" $ do
       maxScoreRef <- newIORef (0 :: Integer)
       let opts = defaultRunOptions {runQuiet = True, runMaxExamples = 1000, runSeed = Just 0}
       runTest opts $ \tc -> do
-        n <- choice tc 1000
-        m <- choice tc 1000
-        let s = toInteger n + toInteger m
+        (_, _, s) <- drawTwo tc
         target tc (fromIntegral s)
         modifyIORef' maxScoreRef (max s)
       readIORef maxScoreRef `shouldReturn` 2000
@@ -165,34 +168,30 @@ spec = do
       minScoreRef <- newIORef (100000 :: Integer)
       let opts = defaultRunOptions {runQuiet = True, runMaxExamples = 200}
       runTest opts $ \tc -> do
-        n <- choice tc 1000
-        m <- choice tc 1000
-        let s = toInteger n + toInteger m
+        (_, _, s) <- drawTwo tc
         target tc (negate (fromIntegral s))
         modifyIORef' minScoreRef (min s)
       readIORef minScoreRef `shouldReturn` 0
     it "can target a score upwards to interesting and prints choices" $ do
-      let opts = defaultRunOptions {runQuiet = False, runMaxExamples = 1000}
-      (out, res) <-
-        captureStdout $
+      let baseOpts = defaultRunOptions {runQuiet = False, runMaxExamples = 1000}
+      (linesOut, res) <-
+        collectOutput baseOpts $ \opts ->
           tryFailure
             ( runTest opts $ \tc -> do
-                n <- choice tc 1000
-                m <- choice tc 1000
-                let s = toInteger n + toInteger m
+                (_, _, s) <- drawTwo tc
                 target tc (fromIntegral s)
                 when (s == 2000) (throwIO Failure)
             )
       case res of
         Left _ -> pure ()
         Right _ -> expectationFailure "expected Failure"
-      let ls = filter (not . null) (lines out)
-      drop (length ls - 2) ls `shouldBe` ["choice(1000): 1000", "choice(1000): 1000"]
+      drop (length linesOut - 2) linesOut
+        `shouldBe` ["choice(1000): 1000", "choice(1000): 1000"]
     it "targeting when most do not benefit prints expected choices" $ do
       let big = 10000 :: Integer
-          opts = defaultRunOptions {runQuiet = False, runMaxExamples = 1000}
-      (out, res2) <-
-        captureStdout $
+          baseOpts = defaultRunOptions {runQuiet = False, runMaxExamples = 1000}
+      (linesOut, res2) <-
+        collectOutput baseOpts $ \opts ->
           tryFailure
             ( runTest opts $ \tc -> do
                 _ <- choice tc 1000
@@ -204,17 +203,16 @@ spec = do
       case res2 of
         Left _ -> pure ()
         Right _ -> expectationFailure "expected Failure"
-      let ls2 = filter (not . null) (lines out)
-      drop (length ls2 - 3) ls2
+      drop (length linesOut - 3) linesOut
         `shouldBe` ["choice(1000): 0", "choice(1000): 0", "choice(" ++ show big ++ "): " ++ show big]
 
   describe "shrinking" $ do
     it "finds small list (port of test_finds_small_list)" $ do
       -- Expect the minimal failing list to be [1001] and printed via any(...)
       forM_ [0 .. (9 :: Int)] $ \seed -> do
-        let opts = defaultRunOptions {runQuiet = False, runMaxExamples = 200, runSeed = Just seed}
-        (out, res) <-
-          captureStdout $
+        let baseOpts = defaultRunOptions {runQuiet = False, runMaxExamples = 200, runSeed = Just seed}
+        (linesOut, res) <-
+          collectOutput baseOpts $ \opts ->
             tryFailure
               ( runTest opts $ \tc -> do
                   ls <- any tc (lists (integers 0 10000) Nothing Nothing)
@@ -224,8 +222,57 @@ spec = do
         case res of
           Left _ -> pure ()
           Right _ -> expectationFailure "expected Failure"
-        let ls = filter (not . null) (lines out)
-        last ls `shouldBe` "any(lists(integers(0, 10000))): [1001]"
+        last linesOut `shouldBe` "any(lists(integers(0, 10000))): [1001]"
+
+    it "finds small list even with bad lists (PORTED)" $ do
+      -- Port of reference test_finds_small_list_even_with_bad_lists
+      -- Define a monadic strategy that first draws a length [0..10]
+      -- then draws that many integers in [0..10000]. This mimics the
+      -- problematic pattern described in the reference test.
+      let badList =
+            named "bad_list" show $ do
+              n <- integers 0 10
+              let k = fromInteger n
+              replicateM k (integers 0 10000)
+      forM_ [0 .. (9 :: Int)] $ \seed -> do
+        let baseOpts = defaultRunOptions {runQuiet = False, runMaxExamples = 200, runSeed = Just seed}
+        (linesOut, res) <-
+          collectOutput baseOpts $ \opts ->
+            tryFailure
+              ( runTest opts $ \tc -> do
+                  ls <- any tc badList
+                  let s = sum ls
+                  when (s > 1000) (throwIO Failure)
+              )
+        case res of
+          Left _ -> pure ()
+          Right _ -> expectationFailure "expected Failure"
+        last linesOut `shouldBe` "any(bad_list): [1001]"
+
+    it "reduces additive pairs (PORTED)" $ do
+      -- Port of reference test_reduces_additive_pairs
+      let baseOpts = defaultRunOptions {runQuiet = False, runMaxExamples = 10000}
+      (linesOut, res) <-
+        collectOutput baseOpts $ \opts ->
+          tryFailure
+            ( runTest opts $ \tc -> do
+                m <- choice tc 1000
+                n <- choice tc 1000
+                when (m + n > 1000) (throwIO Failure)
+            )
+      case res of
+        Left _ -> pure ()
+        Right _ -> expectationFailure "expected Failure"
+      linesOut `shouldBe` ["choice(1000): 1", "choice(1000): 1000"]
+
+collectOutput :: RunOptions -> (RunOptions -> IO a) -> IO ([String], a)
+collectOutput baseOpts action = do
+  ref <- newIORef []
+  let printer msg = modifyIORef' ref (\xs -> xs ++ [msg])
+      opts = baseOpts {runPrinter = printer}
+  result <- action opts
+  logs <- readIORef ref
+  pure (logs, result)
 
 isFrozen :: Frozen -> Bool
 isFrozen _ = True
