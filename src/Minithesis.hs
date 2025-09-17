@@ -30,7 +30,7 @@ where
 import Control.Exception (Exception, throwIO, try)
 import Control.Monad (replicateM, unless, when)
 import Data.IORef
-import Data.Maybe (isJust)
+import Data.Maybe (fromMaybe, isJust)
 import Data.Word (Word64)
 import System.Random (StdGen, mkStdGen, newStdGen, randomR)
 import Prelude hiding (any)
@@ -348,8 +348,8 @@ integers lo hi = Strategy $ \tc -> do
 -- | List strategy with optional size bounds.
 lists :: Strategy a -> Maybe Int -> Maybe Int -> Strategy [a]
 lists (Strategy elemS) minSize maxSize = Strategy $ \tc -> do
-  let lo = max 0 (maybe 0 id minSize)
-      hi = max lo (maybe (lo + 10) id maxSize) -- default modest max
+  let lo = max 0 (fromMaybe 0 minSize)
+      hi = max lo (fromMaybe (lo + 10) maxSize) -- default modest max
       spanN = fromIntegral (hi - lo) :: Integer
   k <- choice tc spanN
   let len = lo + fromIntegral k

@@ -42,9 +42,7 @@ spec = do
   describe "weighted" $ do
     it "prints a top-level weighted" $ do
       tc <- forChoices [] True
-      (out, res) <- captureStdout $ do
-        b <- weighted tc 0.5
-        pure b
+      (out, res) <- captureStdout $ weighted tc 0.5
       out `shouldBe` "weighted(0.5): False\n"
       res `shouldBe` False
 
@@ -64,7 +62,7 @@ spec = do
           action =
             runTest opts $ \tc -> do
               b <- weighted tc 1.0
-              if b then throwIO Failure else pure ()
+              when b $ throwIO Failure
       action `shouldThrow` isFailure
   describe "limits" $ do
     it "does not exceed max_examples" $ do
