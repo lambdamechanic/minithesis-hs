@@ -83,7 +83,8 @@ data RunOptions
   = RunOptions
   { runMaxExamples :: Int,
     runQuiet :: Bool,
-    runSeed :: Maybe Int
+    runSeed :: Maybe Int,
+    runBufferSize :: Int
   }
   deriving (Eq, Show)
 
@@ -92,7 +93,8 @@ defaultRunOptions =
   RunOptions
     { runMaxExamples = 100,
       runQuiet = False,
-      runSeed = Nothing
+      runSeed = Nothing,
+      runBufferSize = bufferSize
     }
 
 data TestingState
@@ -134,7 +136,12 @@ runGeneration state = do
     else do
       calls <- readIORef (tsCalls state)
       when (calls >= callLimit (tsOptions state)) $ throwIO Unsatisfiable
-      testCase <- newTestCaseWith [] (Just (tsRandom state)) (Just bufferSize) (not (runQuiet (tsOptions state)))
+      testCase <-
+        newTestCaseWith
+          []
+          (Just (tsRandom state))
+          (Just (runBufferSize (tsOptions state)))
+          (not (runQuiet (tsOptions state)))
       _ <- executeTestCase state testCase
       runGeneration state
 

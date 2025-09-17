@@ -17,6 +17,21 @@ spec = do
       tc <- forChoices [] False
       choice tc (2 ^ (64 :: Integer)) `shouldThrow` isValueError
   describe "runTest" $ do
+    it "can choose the full 64-bit range" $ do
+      let opts = defaultRunOptions {runQuiet = True}
+      runTest opts $ \tc -> do
+        _ <- choice tc (2 ^ (64 :: Integer) - 1)
+        pure ()
+
+    it "raises Unsatisfiable for an unbounded test function when the buffer is small" $ do
+      let opts = defaultRunOptions {runQuiet = True, runBufferSize = 8}
+          action =
+            runTest opts $ \tc ->
+              let loop = do
+                    _ <- choice tc 10
+                    loop
+               in loop
+      action `shouldThrow` isUnsatisfiable
     it "satisfies preconditions when using assume" $ do
       let opts = defaultRunOptions {runQuiet = True}
       runTest opts $ \tc -> do
