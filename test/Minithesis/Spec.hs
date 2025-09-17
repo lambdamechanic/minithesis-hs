@@ -206,6 +206,29 @@ spec = do
       drop (length linesOut - 3) linesOut
         `shouldBe` ["choice(1000): 0", "choice(1000): 0", "choice(" ++ show big ++ "): " ++ show big]
 
+    it "finds a local maximum (PORTED)" $ do
+      forM_ [0 .. (99 :: Int)] $ \seed -> do
+        let opts =
+              defaultRunOptions
+                { runQuiet = True,
+                  runMaxExamples = 200,
+                  runSeed = Just seed
+                }
+        result <-
+          tryFailure
+            ( runTest opts $ \tc -> do
+                m <- choice tc 1000
+                n <- choice tc 1000
+                let dm = fromIntegral m - 500 :: Double
+                    dn = fromIntegral n - 500 :: Double
+                    score = negate (dm * dm + dn * dn)
+                target tc score
+                when (m == 500 && n == 500) (throwIO Failure)
+            )
+        case result of
+          Left _ -> pure ()
+          Right _ -> expectationFailure "expected Failure"
+
   describe "shrinking" $ do
     it "finds small list (port of test_finds_small_list)" $ do
       -- Expect the minimal failing list to be [1001] and printed via any(...)

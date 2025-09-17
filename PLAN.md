@@ -43,9 +43,9 @@ Keep this document up to date as a living record of porting progress from the Py
 - ✅ test_reduces_additive_pairs
 - ✅ test_reuses_results_from_the_database
 - ✅ test_function_cache
+- ✅ test_finds_a_local_maximum
 
 ## Missing Python Tests To Port
-- test_finds_a_local_maximum
 - test_target_and_reduce
 
 ## Dropped Reference Tests
