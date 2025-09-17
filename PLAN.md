@@ -36,6 +36,7 @@ Keep this document up to date as a living record of porting progress from the Py
  - ✅ test_bound_possibility
  - ✅ test_can_target_a_score_upwards_without_failing
  - ✅ test_can_target_a_score_downwards
+ - ✅ test_can_choose_full_64_bits
 
 ## Design Notes
 - Library module will be decomposed into `Minithesis.TestCase`, `Minithesis.State`, and generator modules as features land.

@@ -318,7 +318,7 @@ def test_errors_on_too_large_choice():  # -- PORTED
         tc.choice(2 ** 64)
 
 
-def test_can_choose_full_64_bits():
+def test_can_choose_full_64_bits():  # -- PORTED
     @run_test()
     def _(tc):
         tc.choice(2 ** 64 - 1)
