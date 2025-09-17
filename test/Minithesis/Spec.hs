@@ -120,6 +120,18 @@ spec = do
             _ <- any tc nothing
             pure ()
       action `shouldThrow` isUnsatisfiable
+    it "cannot witness empty mix_of" $ do
+      let opts = defaultRunOptions {runQuiet = True, runMaxExamples = 5}
+          action = runTest opts $ \tc -> do
+            _ <- any tc (mixOf ([] :: [Strategy Integer]))
+            pure ()
+      action `shouldThrow` isUnsatisfiable
+    it "can draw mixture" $ do
+      let opts = defaultRunOptions {runQuiet = True}
+      runTest opts $ \tc -> do
+        m <- any tc (mixOf [integers (-5) 0, integers 2 5])
+        m `shouldSatisfy` (\x -> (x >= -5 && x <= 0) || (x >= 2 && x <= 5))
+        m `shouldSatisfy` (/= (1 :: Integer))
 
 isFrozen :: Frozen -> Bool
 isFrozen _ = True
