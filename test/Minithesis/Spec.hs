@@ -142,6 +142,8 @@ captureStdout :: IO a -> IO (String, a)
 captureStdout action = do
   -- Save original stdout
   oldStdout <- hDuplicate stdout
+  -- Flush any buffered progress output from the test runner
+  hFlush stdout
   hSetBuffering stdout LineBuffering
   (path, h) <- openTempFile "." "minithesis-stdout.txt"
   hSetBuffering h LineBuffering
