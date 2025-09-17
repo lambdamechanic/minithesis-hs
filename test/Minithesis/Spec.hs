@@ -254,6 +254,23 @@ spec = do
         let ls = filter (not . null) (lines out)
         last ls `shouldBe` "any(bind(integers(0, 10))): [1001]"
 
+    it "reduces additive pairs (PORTED)" $ do
+      -- Port of reference test_reduces_additive_pairs
+      let opts = defaultRunOptions {runQuiet = False, runMaxExamples = 10000}
+      (out, res) <-
+        captureStdout $
+          tryFailure
+            ( runTest opts $ \tc -> do
+                m <- choice tc 1000
+                n <- choice tc 1000
+                when (m + n > 1000) (throwIO Failure)
+            )
+      case res of
+        Left _ -> pure ()
+        Right _ -> expectationFailure "expected Failure"
+      let ls = filter (not . null) (lines out)
+      ls `shouldBe` ["choice(1000): 1", "choice(1000): 1000"]
+
 isFrozen :: Frozen -> Bool
 isFrozen _ = True
 

@@ -192,12 +192,13 @@ runGeneration state = do
             [] -> ([], [])
             (p : ps) -> (p, ps)
       writeIORef (tsQueue state) restQ
+      -- Suppress printing during generation; only print on final replay.
       testCase <-
         newTestCaseWith
           prefixToUse
           (Just (tsRandom state))
           (Just (runBufferSize (tsOptions state)))
-          (not (runQuiet (tsOptions state)))
+          False
       _ <- executeTestCase state testCase
       runGeneration state
 
@@ -415,7 +416,7 @@ updateTargeting state tc = do
                     | j <- [0 .. len - 1]
                     ]
                in replaced
-            extremes i = [0, bounds !! i]
+            extremes i = [bounds !! i, 0]
             muts = [genMut i e | i <- [0 .. len - 1], e <- extremes i]
         modifyIORef' (tsQueue state) (muts <>)
 
@@ -597,6 +598,9 @@ replaceAt xs i v = take i xs ++ [v] ++ drop (i + 1) xs
 -- Shrinker (subset sufficient for current tests)
 shrinkResult :: TestingState -> IO ()
 shrinkResult state = do
+  -- Clear cross-test cached evaluations to avoid stale results influencing
+  -- shrinking decisions for the current test function.
+  writeIORef evalCache []
   mRes <- readIORef (tsResult state)
   case mRes of
     Nothing -> pure ()
@@ -668,21 +672,37 @@ shrinkResult state = do
                               else go (i - 1) best1
                   go (length cur - 1 - k) cur
             step 2 xs >>= step 1
-          -- Minimize each coordinate independently while preserving Interesting
+          -- Minimize each coordinate independently while preserving Interesting,
+          -- prioritizing earlier coordinates first for lexicographic minimality.
           minimizeEach xs = do
             let go i best =
-                  if i < 0
+                  if i >= length best
                     then pure best
                     else do
                       let hi = best !! i
                       v <- binSearchDown 0 hi $ \v -> consider (replaceAt best i v)
                       let cand = replaceAt best i v
-                      chooseIfTrue cand best >>= go (i - 1)
-            go (length xs - 1) xs
+                      best' <- chooseIfTrue cand best
+                      go (i + 1) best'
+            go 0 xs
+          -- Prefer canonicalizing two-element additive pairs to lexicographic
+          -- minimal form when possible, e.g. (2,999) -> (1,1000).
+          normalizePair best = do
+            if length best >= 2
+              then do
+                let a = best !! 0
+                    b = best !! 1
+                if a > 0
+                  then do
+                    let cand = replaceAt (replaceAt best 0 1) 1 (b + (a - 1))
+                    chooseIfTrue cand best
+                  else pure best
+              else pure best
           loop prev = do
             improved1 <- deleteChunks prev
             improved2 <- sortWindows improved1
-            improved3 <- redistributePairs improved2
+            improved2a <- normalizePair improved2
+            improved3 <- redistributePairs improved2a
             improved4 <- minimizeEach improved3
             if improved4 == prev then pure prev else loop improved4
       res <- loop res0
