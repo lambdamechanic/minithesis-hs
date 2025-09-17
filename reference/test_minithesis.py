@@ -356,7 +356,7 @@ def test_cannot_witness_nothing():  # -- PORTED
             tc.any(nothing())
 
 
-def test_cannot_witness_empty_mix_of():
+def test_cannot_witness_empty_mix_of():  # -- PORTED
     with pytest.raises(Unsatisfiable):
 
         @run_test()
@@ -364,7 +364,7 @@ def test_cannot_witness_empty_mix_of():
             tc.any(mix_of())
 
 
-def test_can_draw_mixture():
+def test_can_draw_mixture():  # -- PORTED
     @run_test()
     def _(tc):
         m = tc.any(mix_of(integers(-5, 0), integers(2, 5)))
