@@ -3,10 +3,10 @@ module Minithesis.Spec (spec) where
 import Control.Exception (Exception, throwIO)
 import Control.Monad (forM_, when)
 import Data.IORef
+import GHC.IO.Handle (hDuplicate, hDuplicateTo)
 import Minithesis
 import System.Directory (removeFile)
 import System.IO
-import GHC.IO.Handle (hDuplicate, hDuplicateTo)
 import Test.Hspec
 
 spec :: Spec
@@ -57,6 +57,13 @@ spec = do
                 when w (throwIO Failure)
               v <- choice tc 1
               when (v == 1) (throwIO Failure)
+      action `shouldThrow` isFailure
+    it "weighted 1.0 is always True (guaranteed)" $ do
+      let opts = defaultRunOptions {runQuiet = True}
+          action =
+            runTest opts $ \tc -> do
+              b <- weighted tc 1.0
+              if b then throwIO Failure else pure ()
       action `shouldThrow` isFailure
   describe "limits" $ do
     it "does not exceed max_examples" $ do
