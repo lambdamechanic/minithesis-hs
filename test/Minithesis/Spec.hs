@@ -206,6 +206,44 @@ spec = do
       drop (length linesOut - 3) linesOut
         `shouldBe` ["choice(1000): 0", "choice(1000): 0", "choice(" ++ show big ++ "): " ++ show big]
 
+    it "finds a local maximum (PORTED)" $ do
+      forM_ [0 .. (99 :: Int)] $ \seed -> do
+        let opts =
+              defaultRunOptions
+                { runQuiet = True,
+                  runMaxExamples = 200,
+                  runSeed = Just seed
+                }
+        result <-
+          tryFailure
+            ( runTest opts $ \tc -> do
+                m <- choice tc 1000
+                n <- choice tc 1000
+                let dm = fromIntegral m - 500 :: Double
+                    dn = fromIntegral n - 500 :: Double
+                    score = negate (dm * dm + dn * dn)
+                target tc score
+                when (m == 500 && n == 500) (throwIO Failure)
+            )
+        case result of
+          Left _ -> pure ()
+          Right _ -> expectationFailure "expected Failure"
+
+    it "target and reduce (PORTED)" $ do
+      let baseOpts = defaultRunOptions {runQuiet = False, runMaxExamples = 1000}
+      (linesOut, res) <-
+        collectOutput baseOpts $ \opts ->
+          tryFailure
+            ( runTest opts $ \tc -> do
+                m <- choice tc 100000
+                target tc (fromIntegral m)
+                when (m > 99900) (throwIO Failure)
+            )
+      case res of
+        Left _ -> pure ()
+        Right _ -> expectationFailure "expected Failure"
+      last linesOut `shouldBe` "choice(100000): 99901"
+
   describe "shrinking" $ do
     it "finds small list (port of test_finds_small_list)" $ do
       -- Expect the minimal failing list to be [1001] and printed via any(...)
@@ -264,6 +302,28 @@ spec = do
         Left _ -> pure ()
         Right _ -> expectationFailure "expected Failure"
       linesOut `shouldBe` ["choice(1000): 1", "choice(1000): 1000"]
+
+  describe "caching" $ do
+    it "matches Python's test_function_cache" $ do
+      callsRef <- newIORef (0 :: Int)
+      cache <- cachedTestFunction $ \tc -> do
+        modifyIORef' callsRef (+ 1)
+        v <- choice tc 1000
+        when (v >= 200) (markStatus tc Interesting)
+        w <- choice tc 1
+        when (w == 0) (reject tc)
+      let expectStatus choices =
+            case choices of
+              [1, 1] -> Valid
+              [1] -> Overrun
+              [1000] -> Interesting
+              [1000, 1] -> Interesting
+              _ -> error "unexpected choice sequence"
+          sequences = [[1, 1], [1], [1000], [1000], [1000, 1]]
+      forM_ sequences $ \bs -> do
+        st <- cache bs
+        st `shouldBe` expectStatus bs
+      readIORef callsRef `shouldReturn` 2
 
 collectOutput :: RunOptions -> (RunOptions -> IO a) -> IO ([String], a)
 collectOutput baseOpts action = do

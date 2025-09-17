@@ -19,6 +19,7 @@ module Minithesis
     satisfying,
     mixOf,
     named,
+    cachedTestFunction,
     TestCase,
     forChoices,
     newTestCase,
@@ -35,9 +36,10 @@ module Minithesis
 where
 
 import Control.Exception (Exception, SomeException, throwIO, try)
-import Control.Monad (forM_, replicateM, unless, when)
+import Control.Monad (replicateM, unless, when)
 import Data.IORef
 import qualified Data.List as L
+import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe, isJust, isNothing)
 import Data.Word (Word64)
 import qualified System.IO.Unsafe as Unsafe
@@ -186,8 +188,11 @@ runGeneration state = do
   valid <- readIORef (tsValid state)
   calls <- readIORef (tsCalls state)
   trivial <- readIORef (tsTrivial state)
+  mBest <- readIORef (tsBestScore state)
   let opts = tsOptions state
-  if isJust res || valid >= runMaxExamples opts || calls >= callLimit opts || trivial
+      halfLimit = runMaxExamples opts `div` 2
+      stopForTarget = isJust mBest && valid > halfLimit
+  if isJust res || valid >= runMaxExamples opts || calls >= callLimit opts || trivial || stopForTarget
     then pure ()
     else do
       prefixQueue <- readIORef (tsQueue state)
@@ -585,26 +590,105 @@ sortKey xs = (length xs, xs)
 -- Targeted optimisation pass (adapted, simplified)
 targetOptimisation :: TestingState -> IO ()
 targetOptimisation state = do
-  let opts = tsOptions state
-  mScore <- readIORef (tsBestScore state)
-  mRes <- readIORef (tsResult state)
-  when (isNothing mRes && isJust mScore) $ do
-    let adjust choices i step = do
-          let j = fromIntegral i
-          let new = replaceAt choices j (fromIntegral (fromIntegral (choices !! j) + step))
-          tc <- forChoicesWithPrinter new False (runPrinter opts)
-          _ <- executeTestCase state tc
-          st <- getStatus tc
-          sc <- readIORef (tcTargetingScore tc)
-          pure $ case (st, sc, mScore) of
-            (Just Valid, Just scv, Just best) -> scv > best
-            (Just Valid, Just scv, Nothing) -> scv >= 0
-            _ -> False
+  res <- readIORef (tsResult state)
+  when (isNothing res) $ do
+    mScore <- readIORef (tsBestScore state)
     bestChoices <- readIORef (tsBestChoices state)
-    forM_ [0 .. length bestChoices - 1] $ \i -> do
-      _ <- adjust bestChoices i (1 :: Integer)
-      _ <- adjust bestChoices i ((-1) :: Integer)
-      pure ()
+    bestBounds <- readIORef (tsBestBounds state)
+    case (mScore, bestChoices) of
+      (Just score, _ : _) -> do
+        let opts = tsOptions state
+            shouldContinue = do
+              res' <- readIORef (tsResult state)
+              trivial <- readIORef (tsTrivial state)
+              valid <- readIORef (tsValid state)
+              calls <- readIORef (tsCalls state)
+              let limit = callLimit opts
+              pure (not trivial && isNothing res' && valid < runMaxExamples opts && calls < limit)
+            randomIndex lo hi = do
+              gen <- readIORef (tsRandom state)
+              let (v, gen') = randomR (lo, hi) gen
+              writeIORef (tsRandom state) gen'
+              pure v
+        scoreRef <- newIORef score
+        choicesRef <- newIORef bestChoices
+        boundsRef <- newIORef bestBounds
+        let adjust idx step = do
+              continue <- shouldContinue
+              if not continue
+                then pure False
+                else do
+                  choices <- readIORef choicesRef
+                  bounds <- readIORef boundsRef
+                  if idx >= length choices
+                    then pure False
+                    else do
+                      let current = toInteger (choices !! idx)
+                          bound = if idx < length bounds then bounds !! idx else toInteger maxWord64
+                          newVal = current + step
+                      if newVal < 0 || newVal > bound
+                        then pure False
+                        else do
+                          let candidate = replaceAt choices idx (fromInteger newVal)
+                          tc <- forChoicesWithPrinter candidate False (runPrinter opts)
+                          _ <- executeTestCase state tc
+                          newScoreM <- readIORef (tsBestScore state)
+                          case newScoreM of
+                            Nothing -> pure False
+                            Just newScore -> do
+                              oldScore <- readIORef scoreRef
+                              if newScore > oldScore
+                                then do
+                                  writeIORef scoreRef newScore
+                                  newChoices <- readIORef (tsBestChoices state)
+                                  newBounds <- readIORef (tsBestBounds state)
+                                  writeIORef choicesRef newChoices
+                                  writeIORef boundsRef newBounds
+                                  pure True
+                                else pure False
+            tryDirections idx = do
+              improvedPos <- adjust idx 1
+              if improvedPos
+                then pure (1 :: Integer)
+                else do
+                  improvedNeg <- adjust idx (-1)
+                  pure (if improvedNeg then -1 else 0)
+            expand idx sign step = do
+              continue <- shouldContinue
+              if not continue
+                then pure step
+                else do
+                  improved <- adjust idx (sign * toInteger step)
+                  if improved
+                    then expand idx sign (step * 2)
+                    else pure step
+            whileAdjust idx sign step = do
+              continue <- shouldContinue
+              when continue $ do
+                improved <- adjust idx (sign * toInteger step)
+                when improved (whileAdjust idx sign step)
+            refine idx sign step
+              | step <= 0 = pure ()
+              | otherwise = do
+                  whileAdjust idx sign step
+                  refine idx sign (step `div` 2)
+            loop = do
+              continue <- shouldContinue
+              when continue $ do
+                choices <- readIORef choicesRef
+                bounds <- readIORef boundsRef
+                let len = min (length choices) (length bounds)
+                if len <= 0
+                  then pure ()
+                  else do
+                    idx <- randomIndex 0 (len - 1)
+                    sign <- tryDirections idx
+                    when (sign /= 0) $ do
+                      failing <- expand idx sign 1
+                      refine idx sign (max 1 (failing `div` 2))
+                    loop
+        loop
+      _ -> pure ()
 
 replaceAt :: [a] -> Int -> a -> [a]
 replaceAt xs i v = take i xs ++ [v] ++ drop (i + 1) xs
@@ -767,3 +851,57 @@ cachedEvaluate state choices = do
       st <- finaliseStatus tc
       modifyIORef' evalCache ((choices, st) :)
       pure st
+
+-- | Create a cached version of a test function over explicit choice sequences.
+cachedTestFunction :: (TestCase -> IO ()) -> IO ([Word64] -> IO Status)
+cachedTestFunction testFn = do
+  cacheRef <- newIORef cacheEmpty
+  pure $ \choices -> do
+    cache <- readIORef cacheRef
+    case cacheLookup cache choices of
+      Just st -> pure st
+      Nothing -> do
+        tc <- forChoicesWithPrinter choices False (const (pure ()))
+        r <- try (testFn tc) :: IO (Either SomeException ())
+        case r of
+          Left _ -> do
+            m <- getStatus tc
+            case m of
+              Nothing -> do
+                _ <- try (markStatus tc Interesting) :: IO (Either StopTest a)
+                pure ()
+              Just _ -> pure ()
+          Right _ -> pure ()
+        st <- finaliseStatus tc
+        recorded <- getChoices tc
+        modifyIORef' cacheRef (\tree -> cacheInsert tree recorded st)
+        pure st
+
+data CacheTree
+  = CacheBranch !(Map.Map Word64 CacheTree)
+  | CacheLeaf !Status
+
+cacheEmpty :: CacheTree
+cacheEmpty = CacheBranch Map.empty
+
+cacheLookup :: CacheTree -> [Word64] -> Maybe Status
+cacheLookup (CacheLeaf status) _ = Just status
+cacheLookup (CacheBranch _) [] = Just Overrun
+cacheLookup (CacheBranch m) (c : cs) =
+  case Map.lookup c m of
+    Nothing -> Nothing
+    Just child -> cacheLookup child cs
+
+cacheInsert :: CacheTree -> [Word64] -> Status -> CacheTree
+cacheInsert node [] status
+  | status == Overrun = node
+  | otherwise = CacheLeaf status
+cacheInsert (CacheLeaf _) choices status = cacheInsert cacheEmpty choices status
+cacheInsert (CacheBranch m) (c : cs) status
+  | null cs && status /= Overrun = CacheBranch (Map.insert c (CacheLeaf status) m)
+  | otherwise =
+      let child = case Map.lookup c m of
+            Just (CacheBranch m') -> CacheBranch m'
+            _ -> cacheEmpty
+          child' = cacheInsert child cs status
+       in CacheBranch (Map.insert c child' m)
