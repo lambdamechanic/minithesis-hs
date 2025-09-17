@@ -229,6 +229,21 @@ spec = do
           Left _ -> pure ()
           Right _ -> expectationFailure "expected Failure"
 
+    it "target and reduce (PORTED)" $ do
+      let baseOpts = defaultRunOptions {runQuiet = False, runMaxExamples = 1000}
+      (linesOut, res) <-
+        collectOutput baseOpts $ \opts ->
+          tryFailure
+            ( runTest opts $ \tc -> do
+                m <- choice tc 100000
+                target tc (fromIntegral m)
+                when (m > 99900) (throwIO Failure)
+            )
+      case res of
+        Left _ -> pure ()
+        Right _ -> expectationFailure "expected Failure"
+      last linesOut `shouldBe` "choice(100000): 99901"
+
   describe "shrinking" $ do
     it "finds small list (port of test_finds_small_list)" $ do
       -- Expect the minimal failing list to be [1001] and printed via any(...)

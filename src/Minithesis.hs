@@ -685,7 +685,7 @@ targetOptimisation state = do
                     sign <- tryDirections idx
                     when (sign /= 0) $ do
                       failing <- expand idx sign 1
-                      refine idx sign (failing `div` 2)
+                      refine idx sign (max 1 (failing `div` 2))
                     loop
         loop
       _ -> pure ()
