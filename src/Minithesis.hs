@@ -18,6 +18,7 @@ module Minithesis
     nothing,
     satisfying,
     mixOf,
+    named,
     TestCase,
     forChoices,
     newTestCase,
@@ -91,6 +92,7 @@ data TestCase
     tcBounds :: IORef [Integer],
     tcStatus :: IORef (Maybe Status),
     tcPrintResults :: Bool,
+    tcPrinter :: String -> IO (),
     tcDepth :: IORef Int,
     tcTargetingScore :: IORef (Maybe Double)
   }
@@ -100,9 +102,9 @@ data RunOptions
   { runMaxExamples :: Int,
     runQuiet :: Bool,
     runSeed :: Maybe Int,
-    runBufferSize :: Int
+    runBufferSize :: Int,
+    runPrinter :: String -> IO ()
   }
-  deriving (Eq, Show)
 
 defaultRunOptions :: RunOptions
 defaultRunOptions =
@@ -110,7 +112,8 @@ defaultRunOptions =
     { runMaxExamples = 100,
       runQuiet = False,
       runSeed = Nothing,
-      runBufferSize = bufferSize
+      runBufferSize = bufferSize,
+      runPrinter = putStrLn
     }
 
 data TestingState
@@ -173,7 +176,7 @@ runTest opts userFunction = do
   case mRes of
     Nothing -> pure ()
     Just choices -> do
-      tc <- forChoices choices (not (runQuiet opts))
+      tc <- forChoicesWithPrinter choices (not (runQuiet opts)) (runPrinter opts)
       -- Replay without catching user exceptions so they propagate
       userFunction tc
 
@@ -199,6 +202,7 @@ runGeneration state = do
           (Just (tsRandom state))
           (Just (runBufferSize (tsOptions state)))
           False
+          (runPrinter opts)
       _ <- executeTestCase state testCase
       runGeneration state
 
@@ -243,17 +247,21 @@ finaliseStatus testCase = do
 
 -- | Construct a deterministic test case that replays the supplied choices.
 forChoices :: [Word64] -> Bool -> IO TestCase
-forChoices prefix =
-  newTestCaseWith prefix Nothing (Just (length prefix))
+forChoices prefix printResults =
+  forChoicesWithPrinter prefix printResults putStrLn
+
+forChoicesWithPrinter :: [Word64] -> Bool -> (String -> IO ()) -> IO TestCase
+forChoicesWithPrinter prefix printResults printer =
+  newTestCaseWith prefix Nothing (Just (length prefix)) printResults printer
 
 -- | Construct a fresh test case backed by an RNG.
 newTestCase :: StdGen -> Int -> Bool -> IO TestCase
 newTestCase gen maxSize printResults = do
   randomRef <- newIORef gen
-  newTestCaseWith [] (Just randomRef) (Just maxSize) printResults
+  newTestCaseWith [] (Just randomRef) (Just maxSize) printResults putStrLn
 
-newTestCaseWith :: [Word64] -> Maybe (IORef StdGen) -> Maybe Int -> Bool -> IO TestCase
-newTestCaseWith prefix randomRef maxSize printResults = do
+newTestCaseWith :: [Word64] -> Maybe (IORef StdGen) -> Maybe Int -> Bool -> (String -> IO ()) -> IO TestCase
+newTestCaseWith prefix randomRef maxSize printResults printer = do
   choicesRef <- newIORef []
   boundsRef <- newIORef []
   statusRef <- newIORef Nothing
@@ -268,6 +276,7 @@ newTestCaseWith prefix randomRef maxSize printResults = do
         tcBounds = boundsRef,
         tcStatus = statusRef,
         tcPrintResults = printResults,
+        tcPrinter = printer,
         tcDepth = depthRef,
         tcTargetingScore = targetingRef
       }
@@ -380,7 +389,7 @@ randomBounded tc n =
 printIfNeeded :: TestCase -> String -> IO ()
 printIfNeeded tc message = do
   depth <- readIORef (tcDepth tc)
-  when (tcPrintResults tc && depth == 0) $ putStrLn message
+  when (tcPrintResults tc && depth == 0) $ tcPrinter tc message
 
 -- | Record a targeting score for the current test case.
 target :: TestCase -> Double -> IO ()
@@ -551,6 +560,10 @@ mixOf xs =
     ("mixOf [" ++ L.intercalate "," (map strategyName xs) ++ "]")
     Nothing
 
+-- | Assign a name and display function to an existing strategy.
+named :: String -> (a -> String) -> Strategy a -> Strategy a
+named name sh (Strategy f _ _) = Strategy f name (Just sh)
+
 -- | Filter a strategy with a predicate, rejecting values that do not satisfy it.
 satisfying :: Strategy a -> (a -> Bool) -> Strategy a
 satisfying (Strategy fa name mShow) p =
@@ -572,13 +585,14 @@ sortKey xs = (length xs, xs)
 -- Targeted optimisation pass (adapted, simplified)
 targetOptimisation :: TestingState -> IO ()
 targetOptimisation state = do
+  let opts = tsOptions state
   mScore <- readIORef (tsBestScore state)
   mRes <- readIORef (tsResult state)
   when (isNothing mRes && isJust mScore) $ do
     let adjust choices i step = do
           let j = fromIntegral i
           let new = replaceAt choices j (fromIntegral (fromIntegral (choices !! j) + step))
-          tc <- forChoices new False
+          tc <- forChoicesWithPrinter new False (runPrinter opts)
           _ <- executeTestCase state tc
           st <- getStatus tc
           sc <- readIORef (tcTargetingScore tc)
@@ -741,7 +755,8 @@ cachedEvaluate state choices = do
   case lookup choices cache of
     Just st -> pure st
     Nothing -> do
-      tc <- forChoices choices False
+      let printer = runPrinter (tsOptions state)
+      tc <- forChoicesWithPrinter choices False printer
       -- Run and capture status; catch exceptions and mark interesting if needed
       r <- try (tsTestFunction state tc) :: IO (Either SomeException ())
       case r of

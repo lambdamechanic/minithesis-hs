@@ -172,9 +172,9 @@ spec = do
         modifyIORef' minScoreRef (min s)
       readIORef minScoreRef `shouldReturn` 0
     it "can target a score upwards to interesting and prints choices" $ do
-      let opts = defaultRunOptions {runQuiet = False, runMaxExamples = 1000}
+      let baseOpts = defaultRunOptions {runQuiet = False, runMaxExamples = 1000}
       (linesOut, res) <-
-        captureLines $
+        collectOutput baseOpts $ \opts ->
           tryFailure
             ( runTest opts $ \tc -> do
                 n <- choice tc 1000
@@ -190,9 +190,9 @@ spec = do
         `shouldBe` ["choice(1000): 1000", "choice(1000): 1000"]
     it "targeting when most do not benefit prints expected choices" $ do
       let big = 10000 :: Integer
-          opts = defaultRunOptions {runQuiet = False, runMaxExamples = 1000}
+          baseOpts = defaultRunOptions {runQuiet = False, runMaxExamples = 1000}
       (linesOut, res2) <-
-        captureLines $
+        collectOutput baseOpts $ \opts ->
           tryFailure
             ( runTest opts $ \tc -> do
                 _ <- choice tc 1000
@@ -211,9 +211,9 @@ spec = do
     it "finds small list (port of test_finds_small_list)" $ do
       -- Expect the minimal failing list to be [1001] and printed via any(...)
       forM_ [0 .. (9 :: Int)] $ \seed -> do
-        let opts = defaultRunOptions {runQuiet = False, runMaxExamples = 200, runSeed = Just seed}
+        let baseOpts = defaultRunOptions {runQuiet = False, runMaxExamples = 200, runSeed = Just seed}
         (linesOut, res) <-
-          captureLines $
+          collectOutput baseOpts $ \opts ->
             tryFailure
               ( runTest opts $ \tc -> do
                   ls <- any tc (lists (integers 0 10000) Nothing Nothing)
@@ -230,32 +230,31 @@ spec = do
       -- Define a monadic strategy that first draws a length [0..10]
       -- then draws that many integers in [0..10000]. This mimics the
       -- problematic pattern described in the reference test.
-      let badList = do
-            n <- integers 0 10
-            let k = fromInteger n
-            replicateM k (integers 0 10000)
+      let badList =
+            named "bad_list" show $ do
+              n <- integers 0 10
+              let k = fromInteger n
+              replicateM k (integers 0 10000)
       forM_ [0 .. (9 :: Int)] $ \seed -> do
-        let opts = defaultRunOptions {runQuiet = False, runMaxExamples = 200, runSeed = Just seed}
+        let baseOpts = defaultRunOptions {runQuiet = False, runMaxExamples = 200, runSeed = Just seed}
         (linesOut, res) <-
-          captureLines $
+          collectOutput baseOpts $ \opts ->
             tryFailure
               ( runTest opts $ \tc -> do
                   ls <- any tc badList
                   let s = sum ls
-                  when (s > 1000) $ do
-                    putStrLn ("any(bind(integers(0, 10))): " ++ show ls)
-                    throwIO Failure
+                  when (s > 1000) (throwIO Failure)
               )
         case res of
           Left _ -> pure ()
           Right _ -> expectationFailure "expected Failure"
-        last linesOut `shouldBe` "any(bind(integers(0, 10))): [1001]"
+        last linesOut `shouldBe` "any(bad_list): [1001]"
 
     it "reduces additive pairs (PORTED)" $ do
       -- Port of reference test_reduces_additive_pairs
-      let opts = defaultRunOptions {runQuiet = False, runMaxExamples = 10000}
+      let baseOpts = defaultRunOptions {runQuiet = False, runMaxExamples = 10000}
       (linesOut, res) <-
-        captureLines $
+        collectOutput baseOpts $ \opts ->
           tryFailure
             ( runTest opts $ \tc -> do
                 m <- choice tc 1000
@@ -267,24 +266,14 @@ spec = do
         Right _ -> expectationFailure "expected Failure"
       linesOut `shouldBe` ["choice(1000): 1", "choice(1000): 1000"]
 
-captureLines :: IO a -> IO ([String], a)
-captureLines action = do
-  let begin = "__MINITHESIS_CAPTURE_BEGIN__"
-      end = "__MINITHESIS_CAPTURE_END__"
-  (out, res) <- captureStdout $ do
-    putStrLn begin
-    r <- action
-    putStrLn end
-    pure r
-  let ls = lines out
-      afterBegin = dropWhile (/= begin) ls
-  case afterBegin of
-    [] -> error "captureLines: begin marker missing"
-    (_ : rest) -> do
-      let (captured, remainder) = break (== end) rest
-      case remainder of
-        [] -> error "captureLines: end marker missing"
-        (_ : _) -> pure (captured, res)
+collectOutput :: RunOptions -> (RunOptions -> IO a) -> IO ([String], a)
+collectOutput baseOpts action = do
+  ref <- newIORef []
+  let printer msg = modifyIORef' ref (\xs -> xs ++ [msg])
+      opts = baseOpts {runPrinter = printer}
+  result <- action opts
+  logs <- readIORef ref
+  pure (logs, result)
 
 isFrozen :: Frozen -> Bool
 isFrozen _ = True
