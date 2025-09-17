@@ -7,6 +7,12 @@ module Minithesis
     RunOptions (..),
     defaultRunOptions,
     runTest,
+    weighted,
+    -- Generators
+    Strategy,
+    any,
+    integers,
+    lists,
     TestCase,
     forChoices,
     newTestCase,
@@ -22,11 +28,12 @@ module Minithesis
 where
 
 import Control.Exception (Exception, throwIO, try)
-import Control.Monad (unless, when)
+import Control.Monad (replicateM, unless, when)
 import Data.IORef
-import Data.Maybe (isJust)
+import Data.Maybe (fromMaybe, isJust)
 import Data.Word (Word64)
 import System.Random (StdGen, mkStdGen, newStdGen, randomR)
+import Prelude hiding (any)
 
 -- | Represents the outcome of executing a test case.
 -- Ordering matches the original Python IntEnum.
@@ -299,3 +306,51 @@ printIfNeeded :: TestCase -> String -> IO ()
 printIfNeeded tc message = do
   depth <- readIORef (tcDepth tc)
   when (tcPrintResults tc && depth == 0) $ putStrLn message
+
+-- | Draw a boolean that is True with the given probability in [0, 1].
+-- If the test case is deterministic (no RNG), this returns False for 0 < p < 1.
+weighted :: TestCase -> Double -> IO Bool
+weighted tc p
+  | p <= 0 = do
+      printIfNeeded tc $ "weighted(" ++ show p ++ "): False"
+      pure False
+  | p >= 1 = do
+      printIfNeeded tc $ "weighted(" ++ show p ++ "): True"
+      pure True
+  | otherwise =
+      case tcRandom tc of
+        Nothing -> do
+          printIfNeeded tc $ "weighted(" ++ show p ++ "): False"
+          pure False
+        Just ref -> do
+          gen <- readIORef ref
+          let (x, nextGen) = randomR (0.0, 1.0 :: Double) gen
+              res = x < p
+          writeIORef ref nextGen
+          printIfNeeded tc $ "weighted(" ++ show p ++ "): " ++ show res
+          pure res
+
+-- | Minimal strategy type for generator-based APIs.
+newtype Strategy a = Strategy {runStrategy :: TestCase -> IO a}
+
+-- | Run a strategy to produce a value.
+any :: TestCase -> Strategy a -> IO a
+any tc (Strategy f) = f tc
+
+-- | Integer strategy drawing from inclusive bounds [lo, hi].
+integers :: Integer -> Integer -> Strategy Integer
+integers lo hi = Strategy $ \tc -> do
+  when (hi < lo) $ throwIO (ValueError $ "Invalid integer bounds [" ++ show lo ++ "," ++ show hi ++ "]")
+  let spanN = hi - lo
+  v <- choice tc spanN
+  pure (lo + toInteger v)
+
+-- | List strategy with optional size bounds.
+lists :: Strategy a -> Maybe Int -> Maybe Int -> Strategy [a]
+lists (Strategy elemS) minSize maxSize = Strategy $ \tc -> do
+  let lo = max 0 (fromMaybe 0 minSize)
+      hi = max lo (fromMaybe (lo + 10) maxSize) -- default modest max
+      spanN = fromIntegral (hi - lo) :: Integer
+  k <- choice tc spanN
+  let len = lo + fromIntegral k
+  replicateM len (elemS tc)

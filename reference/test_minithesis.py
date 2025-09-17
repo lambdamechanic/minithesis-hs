@@ -177,7 +177,7 @@ def test_function_cache():
 
 
 @pytest.mark.parametrize("max_examples", range(1, 100))
-def test_max_examples_is_not_exceeded(max_examples):
+def test_max_examples_is_not_exceeded(max_examples):  # -- PORTED
     """Targeting has a number of places it checks for
     whether we've exceeded the generation limits. This
     makes sure we've checked them all.
@@ -287,7 +287,7 @@ def test_can_target_a_score_downwards(capsys):
     ]
 
 
-def test_prints_a_top_level_weighted(capsys):
+def test_prints_a_top_level_weighted(capsys):  # -- PORTED
     with pytest.raises(AssertionError):
 
         @run_test(database={}, max_examples=1000)
@@ -390,7 +390,7 @@ def test_target_and_reduce(capsys):
     assert captured.out.strip() == "choice(100000): 99901"
 
 
-def test_impossible_weighted():
+def test_impossible_weighted():  # -- PORTED
     with pytest.raises(Failure):
 
         @run_test(database={})
@@ -403,7 +403,7 @@ def test_impossible_weighted():
                 raise Failure()
 
 
-def test_guaranteed_weighted():
+def test_guaranteed_weighted():  # -- PORTED
     with pytest.raises(Failure):
 
         @run_test(database={})
@@ -415,14 +415,14 @@ def test_guaranteed_weighted():
                 assert False
 
 
-def test_size_bounds_on_list():
+def test_size_bounds_on_list():  # -- PORTED
     @run_test(database={})
     def _(tc):
         ls = tc.any(lists(integers(0, 10), min_size=1, max_size=3))
         assert 1 <= len(ls) <= 3
 
 
-def test_forced_choice_bounds():
+def test_forced_choice_bounds():  # -- PORTED
     with pytest.raises(ValueError):
 
         @run_test(database={})
