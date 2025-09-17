@@ -1,7 +1,7 @@
 module Minithesis.Spec (spec) where
 
 import Control.Exception (Exception, throwIO, try)
-import Control.Monad (forM_, when)
+import Control.Monad (forM_, replicateM, when)
 import Data.IORef
 import GHC.IO.Handle (hDuplicate, hDuplicateTo)
 import Minithesis
@@ -226,6 +226,33 @@ spec = do
           Right _ -> expectationFailure "expected Failure"
         let ls = filter (not . null) (lines out)
         last ls `shouldBe` "any(lists(integers(0, 10000))): [1001]"
+
+    it "finds small list even with bad lists (PORTED)" $ do
+      -- Port of reference test_finds_small_list_even_with_bad_lists
+      -- Define a monadic strategy that first draws a length [0..10]
+      -- then draws that many integers in [0..10000]. This mimics the
+      -- problematic pattern described in the reference test.
+      let badList = do
+            n <- integers 0 10
+            let k = fromInteger n
+            replicateM k (integers 0 10000)
+      forM_ [0 .. (9 :: Int)] $ \seed -> do
+        let opts = defaultRunOptions {runQuiet = False, runMaxExamples = 200, runSeed = Just seed}
+        (out, res) <-
+          captureStdout $
+            tryFailure
+              ( runTest opts $ \tc -> do
+                  ls <- any tc badList
+                  let s = sum ls
+                  when (s > 1000) $ do
+                    putStrLn ("any(bind(integers(0, 10))): " ++ show ls)
+                    throwIO Failure
+              )
+        case res of
+          Left _ -> pure ()
+          Right _ -> expectationFailure "expected Failure"
+        let ls = filter (not . null) (lines out)
+        last ls `shouldBe` "any(bind(integers(0, 10))): [1001]"
 
 isFrozen :: Frozen -> Bool
 isFrozen _ = True
