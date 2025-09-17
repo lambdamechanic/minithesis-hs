@@ -21,7 +21,8 @@ lint:
 	fi
 
 test:
-	HSPEC_OPTIONS="--no-color" $(CABAL) test all --test-show-details=direct
+	HSPEC_OPTIONS="--no-color" $(CABAL) test minithesis-hspec --test-show-details=direct
+	$(CABAL) test minithesis-tasty --test-options='--color=never' --test-show-details=direct
 
 check:
 	$(CABAL) check

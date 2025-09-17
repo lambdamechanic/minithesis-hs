@@ -72,5 +72,10 @@ jobs:
           echo "Using cabal --coverage-for=${UNIT_ID}"
           cabal test minithesis-hspec --enable-coverage --enable-per-component --coverage-for="${UNIT_ID}" --test-show-details=streaming
 
+      - name: Run Tasty tests without color
+        run: |
+          set -euo pipefail
+          cabal test minithesis-tasty --test-options='--color=never' --test-show-details=streaming
+
       - name: Cabal check
         run: cabal check
