@@ -9,3 +9,7 @@ __pycache__
 .coverage
 .hypothesis/
 .pytest_cache/
+dist-newstyle/
+cabal.project.local
+cabal.project.freeze
+.ghc.environment.*

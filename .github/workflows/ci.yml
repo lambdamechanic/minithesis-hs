@@ -1,32 +1,74 @@
-name: ci
+name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: ["**"]
   pull_request:
-    branches: [ master ]
-  workflow_dispatch:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: [3.8, 3.9]
+    permissions:
+      security-events: write
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install flake8 pytest
-        pip install -r requirements.txt
-    - name: Test with pytest
-      run: |
-        pytest
+      - uses: actions/checkout@v4
+
+      - name: HLint scan (code scanning)
+        uses: haskell-actions/hlint-scan@v1
+
+      - name: Set up Haskell
+        uses: haskell-actions/setup@v2
+        with:
+          ghc-version: "9.8.2"
+          cabal-version: "3.12.1.0"
+
+      - name: Cache Cabal store
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cabal/store
+            dist-newstyle
+          key: ${{ runner.os }}-cabal-${{ hashFiles('cabal.project', '**/*.cabal') }}
+          restore-keys: |
+            ${{ runner.os }}-cabal-
+
+      - name: Update package index
+        run: cabal update
+
+      - name: Install tooling (Ormolu only)
+        run: |
+          cabal install \
+            --ignore-project \
+            --installdir="$HOME/.cabal/bin" \
+            --overwrite-policy=always \
+            ormolu-0.7.7.0
+
+      - name: Ormolu formatting check
+        run: |
+          files=$(git ls-files '*.hs')
+          if [ -n "$files" ]; then
+            cabal exec -- ormolu --mode check $files
+          fi
+
+
+      - name: Build (per-component)
+        run: |
+          cabal build all --enable-tests --enable-per-component
+
+      - name: Run tests with coverage-for library only
+        run: |
+          set -euo pipefail
+          # Ensure .tix files land in a predictable location
+          export HPCTIXDIR="$(pwd)/dist-newstyle"
+          # Extract the unit-id of the library component from the plan
+          UNIT_ID=$(jq -r '.__"install-plan"[] | select(."pkg-name" == "minithesis" and ."component-name" == "lib") | ."id"' dist-newstyle/cache/plan.json 2>/dev/null || true)
+          if [ -z "$UNIT_ID" ]; then
+            # Fallback for standard jq (no __ quoting) on most runners
+            UNIT_ID=$(jq -r '."install-plan"[] | select(."pkg-name" == "minithesis" and ."component-name" == "lib") | ."id"' dist-newstyle/cache/plan.json)
+          fi
+          echo "Using cabal --coverage-for=${UNIT_ID}"
+          cabal test --enable-coverage --enable-per-component --coverage-for="${UNIT_ID}" --test-show-details=streaming
+
+      - name: Cabal check
+        run: cabal check
