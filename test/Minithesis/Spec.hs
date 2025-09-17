@@ -3,14 +3,12 @@ module Minithesis.Spec (spec) where
 import Control.Exception (Exception, throwIO, try)
 import Control.Monad (forM_, replicateM, when)
 import Data.IORef
-import Data.List (isPrefixOf)
 import GHC.IO.Handle (hDuplicate, hDuplicateTo)
 import Minithesis
 import System.Directory (removeFile)
 import System.IO
 import Test.Hspec
 import Prelude hiding (any)
-import qualified Prelude as P (any)
 
 spec :: Spec
 spec = do
@@ -175,8 +173,8 @@ spec = do
       readIORef minScoreRef `shouldReturn` 0
     it "can target a score upwards to interesting and prints choices" $ do
       let opts = defaultRunOptions {runQuiet = False, runMaxExamples = 1000}
-      (out, res) <-
-        captureStdout $
+      (linesOut, res) <-
+        captureLines $
           tryFailure
             ( runTest opts $ \tc -> do
                 n <- choice tc 1000
@@ -188,13 +186,13 @@ spec = do
       case res of
         Left _ -> pure ()
         Right _ -> expectationFailure "expected Failure"
-      let ls = filterInterestingLines out
-      drop (length ls - 2) ls `shouldBe` ["choice(1000): 1000", "choice(1000): 1000"]
+      drop (length linesOut - 2) linesOut
+        `shouldBe` ["choice(1000): 1000", "choice(1000): 1000"]
     it "targeting when most do not benefit prints expected choices" $ do
       let big = 10000 :: Integer
           opts = defaultRunOptions {runQuiet = False, runMaxExamples = 1000}
-      (out, res2) <-
-        captureStdout $
+      (linesOut, res2) <-
+        captureLines $
           tryFailure
             ( runTest opts $ \tc -> do
                 _ <- choice tc 1000
@@ -206,8 +204,7 @@ spec = do
       case res2 of
         Left _ -> pure ()
         Right _ -> expectationFailure "expected Failure"
-      let ls2 = filterInterestingLines out
-      drop (length ls2 - 3) ls2
+      drop (length linesOut - 3) linesOut
         `shouldBe` ["choice(1000): 0", "choice(1000): 0", "choice(" ++ show big ++ "): " ++ show big]
 
   describe "shrinking" $ do
@@ -215,8 +212,8 @@ spec = do
       -- Expect the minimal failing list to be [1001] and printed via any(...)
       forM_ [0 .. (9 :: Int)] $ \seed -> do
         let opts = defaultRunOptions {runQuiet = False, runMaxExamples = 200, runSeed = Just seed}
-        (out, res) <-
-          captureStdout $
+        (linesOut, res) <-
+          captureLines $
             tryFailure
               ( runTest opts $ \tc -> do
                   ls <- any tc (lists (integers 0 10000) Nothing Nothing)
@@ -226,8 +223,7 @@ spec = do
         case res of
           Left _ -> pure ()
           Right _ -> expectationFailure "expected Failure"
-        let ls = filterInterestingLines out
-        last ls `shouldBe` "any(lists(integers(0, 10000))): [1001]"
+        last linesOut `shouldBe` "any(lists(integers(0, 10000))): [1001]"
 
     it "finds small list even with bad lists (PORTED)" $ do
       -- Port of reference test_finds_small_list_even_with_bad_lists
@@ -240,8 +236,8 @@ spec = do
             replicateM k (integers 0 10000)
       forM_ [0 .. (9 :: Int)] $ \seed -> do
         let opts = defaultRunOptions {runQuiet = False, runMaxExamples = 200, runSeed = Just seed}
-        (out, res) <-
-          captureStdout $
+        (linesOut, res) <-
+          captureLines $
             tryFailure
               ( runTest opts $ \tc -> do
                   ls <- any tc badList
@@ -253,14 +249,13 @@ spec = do
         case res of
           Left _ -> pure ()
           Right _ -> expectationFailure "expected Failure"
-        let ls = filterInterestingLines out
-        last ls `shouldBe` "any(bind(integers(0, 10))): [1001]"
+        last linesOut `shouldBe` "any(bind(integers(0, 10))): [1001]"
 
     it "reduces additive pairs (PORTED)" $ do
       -- Port of reference test_reduces_additive_pairs
       let opts = defaultRunOptions {runQuiet = False, runMaxExamples = 10000}
-      (out, res) <-
-        captureStdout $
+      (linesOut, res) <-
+        captureLines $
           tryFailure
             ( runTest opts $ \tc -> do
                 m <- choice tc 1000
@@ -270,16 +265,26 @@ spec = do
       case res of
         Left _ -> pure ()
         Right _ -> expectationFailure "expected Failure"
-      let ls = filterInterestingLines out
-      ls `shouldBe` ["choice(1000): 1", "choice(1000): 1000"]
+      linesOut `shouldBe` ["choice(1000): 1", "choice(1000): 1000"]
 
--- Keep only lines that originate from Minithesis value printing
--- to avoid including test harness progress output.
-filterInterestingLines :: String -> [String]
-filterInterestingLines out =
+captureLines :: IO a -> IO ([String], a)
+captureLines action = do
+  let begin = "__MINITHESIS_CAPTURE_BEGIN__"
+      end = "__MINITHESIS_CAPTURE_END__"
+  (out, res) <- captureStdout $ do
+    putStrLn begin
+    r <- action
+    putStrLn end
+    pure r
   let ls = lines out
-      ok l = P.any (`isPrefixOf` l) ["choice(", "any(", "weighted("]
-   in filter ok ls
+      afterBegin = dropWhile (/= begin) ls
+  case afterBegin of
+    [] -> error "captureLines: begin marker missing"
+    (_ : rest) -> do
+      let (captured, remainder) = break (== end) rest
+      case remainder of
+        [] -> error "captureLines: end marker missing"
+        (_ : _) -> pure (captured, res)
 
 isFrozen :: Frozen -> Bool
 isFrozen _ = True
