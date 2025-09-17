@@ -153,20 +153,4 @@ captureStdout action = do
   hClose oldStdout
   out <- readFile path
   removeFile path
-  pure (stripAnsi out, result)
-
--- Remove ANSI escape sequences from captured output to avoid
--- interference from the test runner's color codes.
-stripAnsi :: String -> String
-stripAnsi [] = []
-stripAnsi ('\ESC' : xs) = stripAnsi (skipAnsi xs)
-stripAnsi (x : xs) = x : stripAnsi xs
-
-skipAnsi :: String -> String
-skipAnsi [] = []
-skipAnsi (c : cs)
-  | isTerminator c = cs
-  | otherwise = skipAnsi cs
-  where
-    isTerminator ch =
-      (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z')
+  pure (out, result)

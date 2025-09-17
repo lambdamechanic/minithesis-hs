@@ -21,7 +21,7 @@ lint:
 	fi
 
 test:
-	$(CABAL) test all --test-show-details=direct
+	HSPEC_OPTIONS="--no-color" $(CABAL) test all --test-show-details=direct
 
 check:
 	$(CABAL) check
