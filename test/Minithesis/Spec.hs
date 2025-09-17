@@ -153,7 +153,7 @@ spec = do
   describe "targeting" $ do
     it "can target a score upwards without failing" $ do
       maxScoreRef <- newIORef (0 :: Integer)
-      let opts = defaultRunOptions {runQuiet = True, runMaxExamples = 1000}
+      let opts = defaultRunOptions {runQuiet = True, runMaxExamples = 1000, runSeed = Just 0}
       runTest opts $ \tc -> do
         n <- choice tc 1000
         m <- choice tc 1000
