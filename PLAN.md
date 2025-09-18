@@ -56,3 +56,4 @@ Keep this document up to date as a living record of porting progress from the Py
 ## Design Notes
 - Library module will be decomposed into `Minithesis.TestCase`, `Minithesis.State`, and generator modules as features land.
 - Hspec specs mirror `reference/test_minithesis.py`; keep sections aligned with their Python counterparts.
+- Exposed helper modules `Minithesis.Hspec` and `Minithesis.Tasty` wrap `runTest` for downstream libraries.
