@@ -1,14 +1,16 @@
 module Minithesis.Hspec
-  ( minithesis,
-    minithesisWith,
+  ( prop,
+    propWith,
   )
 where
 
 import Minithesis (RunOptions, TestCase, defaultRunOptions, runTest)
 import Test.Hspec (Spec, it)
 
-minithesis :: String -> (TestCase -> IO ()) -> Spec
-minithesis = minithesisWith defaultRunOptions
+-- | Modelled after Test.Hspec.QuickCheck.prop
+prop :: String -> (TestCase -> IO ()) -> Spec
+prop = propWith defaultRunOptions
 
-minithesisWith :: RunOptions -> String -> (TestCase -> IO ()) -> Spec
-minithesisWith opts name property = it name (runTest opts property)
+-- | Variant that allows specifying Minithesis RunOptions.
+propWith :: RunOptions -> String -> (TestCase -> IO ()) -> Spec
+propWith opts name property = it name (runTest opts property)

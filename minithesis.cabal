@@ -55,3 +55,51 @@ test-suite minithesis-hspec
       hspec >=2.10,
       tasty,
       tasty-hspec
+
+test-suite minithesis-tasty
+  import: warnings
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test-tasty, test
+  main-is: Spec.hs
+  other-modules:
+      Minithesis.Spec
+  build-depends:
+      base,
+      minithesis,
+      directory,
+      hspec >=2.10,
+      tasty,
+      tasty-hspec
+
+-- CI-only example suites
+flag ci-tests
+  description: Enable CI-only example test suites
+  manual: True
+  default: False
+
+test-suite examples-hspec
+  import: warnings
+  type: exitcode-stdio-1.0
+  hs-source-dirs: examples/hspec
+  main-is: Spec.hs
+  other-modules:
+      Examples.HspecSpec
+  if !flag(ci-tests)
+    buildable: False
+  build-depends:
+      base,
+      minithesis,
+      hspec >=2.10
+
+test-suite examples-tasty
+  import: warnings
+  type: exitcode-stdio-1.0
+  hs-source-dirs: examples/tasty
+  main-is: Spec.hs
+  if !flag(ci-tests)
+    buildable: False
+  build-depends:
+      base,
+      minithesis,
+      tasty,
+      tasty-hunit

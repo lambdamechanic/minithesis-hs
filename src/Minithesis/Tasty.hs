@@ -1,6 +1,6 @@
 module Minithesis.Tasty
-  ( minithesisTest,
-    minithesisTestWith,
+  ( testProperty,
+    testPropertyWith,
   )
 where
 
@@ -8,8 +8,10 @@ import Minithesis (RunOptions, TestCase, defaultRunOptions, runTest)
 import Test.Tasty (TestTree)
 import Test.Tasty.HUnit (testCase)
 
-minithesisTest :: String -> (TestCase -> IO ()) -> TestTree
-minithesisTest = minithesisTestWith defaultRunOptions
+-- | Modelled after Test.Tasty.QuickCheck.testProperty
+testProperty :: String -> (TestCase -> IO ()) -> TestTree
+testProperty = testPropertyWith defaultRunOptions
 
-minithesisTestWith :: RunOptions -> String -> (TestCase -> IO ()) -> TestTree
-minithesisTestWith opts name property = testCase name (runTest opts property)
+-- | Variant that allows specifying Minithesis RunOptions.
+testPropertyWith :: RunOptions -> String -> (TestCase -> IO ()) -> TestTree
+testPropertyWith opts name property = testCase name (runTest opts property)
