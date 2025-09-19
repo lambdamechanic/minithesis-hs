@@ -1,6 +1,3 @@
 packages: ./
 
 write-ghc-environment-files: never
-
-package minithesis
-  test-options: --ghc-options=-threaded --ghc-options=-rtsopts --ghc-options=-with-rtsopts=-N --test-option=+RTS --test-option=-N --test-option=-RTS
