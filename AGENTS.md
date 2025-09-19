@@ -15,6 +15,7 @@
   - This avoids unnecessary rebases later.
 - The Haskell test suite must be written with Hspec while still providing runners for both Hspec and Tasty.
 - Port the Python reference test suite incrementally, marking each Python test as `-- PORTED` once its Haskell counterpart exists.
+- The `gh` CLI is available; use it for GitHub operations (e.g., opening PRs) when automation helps.
 
 ## Formatting
 - Ormolu version: we use `ormolu-0.7.7.0` in CI. Install it locally once so results match:

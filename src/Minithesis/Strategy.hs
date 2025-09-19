@@ -12,16 +12,17 @@ module Minithesis.Strategy
   )
 where
 
-import Control.Exception (throwIO)
+import Control.Exception (bracket_, throwIO)
 import Control.Monad (replicateM, when)
-import Data.IORef (modifyIORef')
 import qualified Data.List as L
 import Data.Maybe (fromMaybe)
 import Minithesis.TestCase
-  ( TestCase (..),
+  ( TestCase,
     ValueError (..),
     choice,
+    popDepth,
     printIfNeeded,
+    pushDepth,
     reject,
   )
 import Prelude hiding (any)
@@ -62,9 +63,7 @@ instance Monad Strategy where
 -- | Run a strategy to produce a value.
 any :: TestCase -> Strategy a -> IO a
 any tc (Strategy f name mShow) = do
-  modifyIORef' (tcDepth tc) (+ 1)
-  result <- f tc
-  modifyIORef' (tcDepth tc) (\d -> d - 1)
+  result <- bracket_ (pushDepth tc) (popDepth tc) (f tc)
   case mShow of
     Just sh -> printIfNeeded tc $ "any(" ++ name ++ "): " ++ sh result
     Nothing -> pure ()

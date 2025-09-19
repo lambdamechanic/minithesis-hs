@@ -1,15 +1,16 @@
+{-# LANGUAGE RankNTypes #-}
+
 module Minithesis.TestCase
   ( Status (..),
     Frozen (..),
     StopTest (..),
     ValueError (..),
     Unsatisfiable (..),
-    TestCase (..),
-    maxWord64,
-    forChoices,
-    forChoicesWithPrinter,
-    newTestCase,
-    newTestCaseWith,
+    TestCase,
+    withChoices,
+    withChoicesWithPrinter,
+    withNewTestCase,
+    withNewTestCaseWith,
     choice,
     forcedChoice,
     reject,
@@ -18,13 +19,19 @@ module Minithesis.TestCase
     setStatus,
     getStatus,
     getChoices,
+    getBounds,
+    getTargetingScore,
     target,
     printIfNeeded,
     finaliseStatus,
+    pushDepth,
+    popDepth,
+    weighted,
+    maxWord64,
   )
 where
 
-import Control.Exception (Exception, throwIO)
+import Control.Exception (Exception, finally, throwIO)
 import Control.Monad (unless, when)
 import Data.IORef
 import Data.Maybe (isJust)
@@ -32,7 +39,6 @@ import Data.Word (Word64)
 import System.Random (StdGen, randomR)
 
 -- | Represents the outcome of executing a test case.
---   Ordering matches the original Python IntEnum for parity.
 data Status
   = Overrun
   | Invalid
@@ -70,72 +76,98 @@ data Unsatisfiable = Unsatisfiable
 
 instance Exception Unsatisfiable
 
-data TestCase
-  = TestCase
-  { tcPrefix :: [Word64],
-    tcRandom :: Maybe (IORef StdGen),
-    tcMaxSize :: Maybe Int,
-    tcChoices :: IORef [Word64],
-    tcBounds :: IORef [Integer],
-    tcStatus :: IORef (Maybe Status),
-    tcPrintResults :: Bool,
-    tcPrinter :: String -> IO (),
-    tcDepth :: IORef Int,
-    tcTargetingScore :: IORef (Maybe Double)
+-- Internal representation -------------------------------------------------
+
+data MutableTestCase
+  = MutableTestCase
+  { mtcPrefix :: [Word64],
+    mtcRandom :: Maybe (IORef StdGen),
+    mtcMaxSize :: Maybe Int,
+    mtcChoices :: IORef [Word64],
+    mtcBounds :: IORef [Integer],
+    mtcStatus :: IORef (Maybe Status),
+    mtcPrintResults :: Bool,
+    mtcPrinter :: String -> IO (),
+    mtcDepth :: IORef Int,
+    mtcTargetingScore :: IORef (Maybe Double),
+    mtcActive :: IORef Bool
   }
 
-maxWord64 :: Integer
-maxWord64 = toInteger (maxBound :: Word64)
+newtype TestCase = TestCase (forall r. (MutableTestCase -> IO r) -> IO r)
 
-forChoices :: [Word64] -> Bool -> IO TestCase
-forChoices prefix printResults =
-  forChoicesWithPrinter prefix printResults putStrLn
+mkTestCase :: MutableTestCase -> TestCase
+mkTestCase mtc = TestCase $ \use -> do
+  ensureActive mtc
+  use mtc
 
-forChoicesWithPrinter :: [Word64] -> Bool -> (String -> IO ()) -> IO TestCase
-forChoicesWithPrinter prefix =
-  newTestCaseWith prefix Nothing (Just (length prefix))
+withMutableTestCase :: TestCase -> (MutableTestCase -> IO a) -> IO a
+withMutableTestCase (TestCase k) = k
 
-newTestCase :: StdGen -> Int -> Bool -> IO TestCase
-newTestCase gen maxSize printResults = do
+ensureActive :: MutableTestCase -> IO ()
+ensureActive mtc = do
+  active <- readIORef (mtcActive mtc)
+  unless active $ throwIO (Frozen "test case is no longer active")
+
+-- Construction ------------------------------------------------------------
+
+withChoices :: [Word64] -> Bool -> (TestCase -> IO a) -> IO a
+withChoices prefix printResults =
+  withChoicesWithPrinter prefix printResults putStrLn
+
+withChoicesWithPrinter :: [Word64] -> Bool -> (String -> IO ()) -> (TestCase -> IO a) -> IO a
+withChoicesWithPrinter prefix =
+  withNewTestCaseWith prefix Nothing (Just (length prefix))
+
+withNewTestCase :: StdGen -> Int -> Bool -> (TestCase -> IO a) -> IO a
+withNewTestCase gen maxSize printResults action = do
   randomRef <- newIORef gen
-  newTestCaseWith [] (Just randomRef) (Just maxSize) printResults putStrLn
+  withNewTestCaseWith [] (Just randomRef) (Just maxSize) printResults putStrLn action
 
-newTestCaseWith :: [Word64] -> Maybe (IORef StdGen) -> Maybe Int -> Bool -> (String -> IO ()) -> IO TestCase
-newTestCaseWith prefix randomRef maxSize printResults printer = do
+withNewTestCaseWith :: [Word64] -> Maybe (IORef StdGen) -> Maybe Int -> Bool -> (String -> IO ()) -> (TestCase -> IO a) -> IO a
+withNewTestCaseWith prefix randomRef maxSize printResults printer action = do
   choicesRef <- newIORef []
   boundsRef <- newIORef []
   statusRef <- newIORef Nothing
   depthRef <- newIORef 0
   targetingRef <- newIORef Nothing
-  pure
-    TestCase
-      { tcPrefix = prefix,
-        tcRandom = randomRef,
-        tcMaxSize = maxSize,
-        tcChoices = choicesRef,
-        tcBounds = boundsRef,
-        tcStatus = statusRef,
-        tcPrintResults = printResults,
-        tcPrinter = printer,
-        tcDepth = depthRef,
-        tcTargetingScore = targetingRef
-      }
+  activeRef <- newIORef True
+  let mtc =
+        MutableTestCase
+          { mtcPrefix = prefix,
+            mtcRandom = randomRef,
+            mtcMaxSize = maxSize,
+            mtcChoices = choicesRef,
+            mtcBounds = boundsRef,
+            mtcStatus = statusRef,
+            mtcPrintResults = printResults,
+            mtcPrinter = printer,
+            mtcDepth = depthRef,
+            mtcTargetingScore = targetingRef,
+            mtcActive = activeRef
+          }
+  action (mkTestCase mtc) `finally` writeIORef activeRef False
+
+-- Operations --------------------------------------------------------------
 
 choice :: TestCase -> Integer -> IO Word64
-choice tc n = do
-  result <- makeChoice tc n (randomBounded tc n)
-  printIfNeeded tc $ "choice(" ++ show n ++ "): " ++ show result
-  pure result
+choice tc n =
+  withMutableTestCase tc $ \mtc -> do
+    result <- makeChoice mtc n (randomBounded mtc n)
+    printIfNeededMutable mtc $ "choice(" ++ show n ++ "): " ++ show result
+    pure result
 
 forcedChoice :: TestCase -> Integer -> IO Word64
-forcedChoice tc n = do
-  prepareChoice tc n
-  let value = fromInteger n
-  appendChoice tc value
-  pure value
+forcedChoice tc n =
+  withMutableTestCase tc $ \mtc -> do
+    prepareChoice mtc n
+    let value = fromInteger n
+    appendChoice mtc value
+    pure value
 
 reject :: TestCase -> IO a
-reject tc = markStatus tc Invalid
+reject tc = withMutableTestCase tc markInvalid
+  where
+    markInvalid mtc = markStatusMutable mtc Invalid
 
 assume :: TestCase -> Bool -> IO ()
 assume tc condition = unless condition $ do
@@ -143,46 +175,90 @@ assume tc condition = unless condition $ do
   pure ()
 
 markStatus :: TestCase -> Status -> IO a
-markStatus tc status = do
-  statusRef <- readIORef (tcStatus tc)
-  when (isJust statusRef) $ throwIO (Frozen "test case already has a status")
-  writeIORef (tcStatus tc) (Just status)
-  throwIO (StopTest status)
+markStatus tc status =
+  withMutableTestCase tc $ \mtc -> markStatusMutable mtc status
 
 setStatus :: TestCase -> Status -> IO ()
-setStatus tc status = writeIORef (tcStatus tc) (Just status)
+setStatus tc status =
+  withMutableTestCase tc $ \mtc -> writeIORef (mtcStatus mtc) (Just status)
 
 getStatus :: TestCase -> IO (Maybe Status)
-getStatus tc = readIORef (tcStatus tc)
+getStatus tc =
+  withMutableTestCase tc $ \mtc -> readIORef (mtcStatus mtc)
 
 getChoices :: TestCase -> IO [Word64]
-getChoices tc = readIORef (tcChoices tc)
+getChoices tc =
+  withMutableTestCase tc $ \mtc -> readIORef (mtcChoices mtc)
+
+getBounds :: TestCase -> IO [Integer]
+getBounds tc =
+  withMutableTestCase tc $ \mtc -> readIORef (mtcBounds mtc)
+
+getTargetingScore :: TestCase -> IO (Maybe Double)
+getTargetingScore tc =
+  withMutableTestCase tc $ \mtc -> readIORef (mtcTargetingScore mtc)
 
 target :: TestCase -> Double -> IO ()
-target tc score = writeIORef (tcTargetingScore tc) (Just score)
+target tc score =
+  withMutableTestCase tc $ \mtc -> writeIORef (mtcTargetingScore mtc) (Just score)
 
 printIfNeeded :: TestCase -> String -> IO ()
-printIfNeeded tc message = do
-  depth <- readIORef (tcDepth tc)
-  when (tcPrintResults tc && depth == 0) $ tcPrinter tc message
+printIfNeeded tc message =
+  withMutableTestCase tc $ \mtc -> printIfNeededMutable mtc message
 
 finaliseStatus :: TestCase -> IO Status
-finaliseStatus tc = do
-  current <- readIORef (tcStatus tc)
-  case current of
-    Nothing -> do
-      writeIORef (tcStatus tc) (Just Valid)
-      pure Valid
-    Just status -> pure status
+finaliseStatus tc =
+  withMutableTestCase tc finaliseMutable
 
--- Internal helpers ------------------------------------------------------
+weighted :: TestCase -> Double -> IO Bool
+weighted tc p =
+  withMutableTestCase tc $ \mtc ->
+    case () of
+      _
+        | p <= 0 -> do
+            printIfNeededMutable mtc $ "weighted(" ++ show p ++ "): False"
+            pure False
+        | p >= 1 -> do
+            printIfNeededMutable mtc $ "weighted(" ++ show p ++ "): True"
+            pure True
+        | otherwise -> do
+            res <- draw mtc
+            printIfNeededMutable mtc $ "weighted(" ++ show p ++ "): " ++ show res
+            pure res
+  where
+    draw mtc =
+      case mtcRandom mtc of
+        Nothing -> pure False
+        Just ref -> do
+          gen <- readIORef ref
+          let (x, nextGen) = randomR (0.0, 1.0 :: Double) gen
+              res = x < p
+          writeIORef ref nextGen
+          pure res
 
-prepareChoice :: TestCase -> Integer -> IO ()
-prepareChoice tc n = do
+-- Internal helpers --------------------------------------------------------
+
+makeChoice :: MutableTestCase -> Integer -> IO Word64 -> IO Word64
+makeChoice mtc n fallback = do
+  prepareChoice mtc n
+  choices <- readIORef (mtcChoices mtc)
+  let idx = length choices
+  value <-
+    if idx < length (mtcPrefix mtc)
+      then pure (mtcPrefix mtc !! idx)
+      else fallback
+  appendChoice mtc value
+  when (toInteger value > n) $ do
+    _ <- markStatusMutable mtc Invalid
+    pure ()
+  pure value
+
+prepareChoice :: MutableTestCase -> Integer -> IO ()
+prepareChoice mtc n = do
   validateBound n
-  ensureMutable tc
-  ensureCapacity tc
-  modifyIORef' (tcBounds tc) (<> [n])
+  ensureMutable mtc
+  ensureCapacity mtc
+  modifyIORef' (mtcBounds mtc) (<> [n])
 
 validateBound :: Integer -> IO ()
 validateBound n
@@ -190,41 +266,27 @@ validateBound n
   | n > maxWord64 = throwIO (ValueError $ "Invalid choice " ++ show n)
   | otherwise = pure ()
 
-ensureMutable :: TestCase -> IO ()
-ensureMutable tc = do
-  statusRef <- readIORef (tcStatus tc)
+ensureMutable :: MutableTestCase -> IO ()
+ensureMutable mtc = do
+  ensureActive mtc
+  statusRef <- readIORef (mtcStatus mtc)
   when (isJust statusRef) $ throwIO (Frozen "test case is frozen")
 
-ensureCapacity :: TestCase -> IO ()
-ensureCapacity tc = do
-  choices <- readIORef (tcChoices tc)
-  case tcMaxSize tc of
+ensureCapacity :: MutableTestCase -> IO ()
+ensureCapacity mtc = do
+  choices <- readIORef (mtcChoices mtc)
+  case mtcMaxSize mtc of
     Just limit | length choices >= limit -> do
-      _ <- markStatus tc Overrun
+      _ <- markStatusMutable mtc Overrun
       pure ()
     _ -> pure ()
 
-appendChoice :: TestCase -> Word64 -> IO ()
-appendChoice tc value = modifyIORef' (tcChoices tc) (<> [value])
+appendChoice :: MutableTestCase -> Word64 -> IO ()
+appendChoice mtc value = modifyIORef' (mtcChoices mtc) (<> [value])
 
-makeChoice :: TestCase -> Integer -> IO Word64 -> IO Word64
-makeChoice tc n fallback = do
-  prepareChoice tc n
-  choices <- readIORef (tcChoices tc)
-  let idx = length choices
-  value <-
-    if idx < length (tcPrefix tc)
-      then pure (tcPrefix tc !! idx)
-      else fallback
-  appendChoice tc value
-  when (toInteger value > n) $ do
-    _ <- markStatus tc Invalid
-    pure ()
-  pure value
-
-randomBounded :: TestCase -> Integer -> IO Word64
-randomBounded tc n =
-  case tcRandom tc of
+randomBounded :: MutableTestCase -> Integer -> IO Word64
+randomBounded mtc n =
+  case mtcRandom mtc of
     Nothing -> throwIO (ValueError "random source unavailable for this test case")
     Just ref -> do
       gen <- readIORef ref
@@ -233,3 +295,41 @@ randomBounded tc n =
           (value, nextGen) = randomR (0, upper) gen
       writeIORef ref nextGen
       pure value
+
+markStatusMutable :: MutableTestCase -> Status -> IO a
+markStatusMutable mtc status = do
+  ensureActive mtc
+  current <- readIORef (mtcStatus mtc)
+  when (isJust current) $ throwIO (Frozen "test case already has a status")
+  writeIORef (mtcStatus mtc) (Just status)
+  throwIO (StopTest status)
+
+printIfNeededMutable :: MutableTestCase -> String -> IO ()
+printIfNeededMutable mtc message = do
+  depth <- readIORef (mtcDepth mtc)
+  when (mtcPrintResults mtc && depth == 0) $ mtcPrinter mtc message
+
+finaliseMutable :: MutableTestCase -> IO Status
+finaliseMutable mtc = do
+  current <- readIORef (mtcStatus mtc)
+  case current of
+    Nothing -> do
+      writeIORef (mtcStatus mtc) (Just Valid)
+      pure Valid
+    Just status -> pure status
+
+maxWord64 :: Integer
+maxWord64 = toInteger (maxBound :: Word64)
+
+-- Local helpers for strategies -------------------------------------------
+
+modifyDepth :: MutableTestCase -> (Int -> Int) -> IO ()
+modifyDepth mtc = modifyIORef' (mtcDepth mtc)
+
+pushDepth :: TestCase -> IO ()
+pushDepth tc =
+  withMutableTestCase tc $ \mtc -> modifyDepth mtc (+ 1)
+
+popDepth :: TestCase -> IO ()
+popDepth tc =
+  withMutableTestCase tc $ \mtc -> modifyDepth mtc (\d -> d - 1)
