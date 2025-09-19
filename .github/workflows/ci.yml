@@ -70,12 +70,7 @@ jobs:
             UNIT_ID=$(jq -r '."install-plan"[] | select(."pkg-name" == "minithesis" and ."component-name" == "lib") | ."id"' dist-newstyle/cache/plan.json)
           fi
           echo "Using cabal --coverage-for=${UNIT_ID}"
-          cabal test minithesis-hspec --enable-coverage --enable-per-component --coverage-for="${UNIT_ID}" --test-show-details=streaming
-
-      - name: Run Tasty tests without color
-        run: |
-          set -euo pipefail
-          cabal test minithesis-tasty --test-options='--color=never' --test-show-details=streaming
+          cabal test minithesis-test --enable-coverage --enable-per-component --coverage-for="${UNIT_ID}" --test-show-details=streaming
 
       - name: Run CI-only example tests (Hspec)
         env:
