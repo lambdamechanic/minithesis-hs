@@ -42,7 +42,7 @@ library
   default-extensions:
       ScopedTypeVariables
 
-test-suite minithesis-hspec
+test-suite minithesis-test
   import: warnings
   type: exitcode-stdio-1.0
   hs-source-dirs: test
