@@ -4,13 +4,18 @@ module Minithesis.Hspec
   )
 where
 
-import Minithesis (RunOptions, TestCase, defaultRunOptions, runTest)
+import Minithesis.Property (ToProperty (..), applyPropertyOptions, runProperty)
+import Minithesis.Runner (RunOptions, defaultRunOptions, resolveRunOptions)
 import Test.Hspec (Spec, it)
 
 -- | Modelled after Test.Hspec.QuickCheck.prop
-prop :: String -> (TestCase -> IO ()) -> Spec
+prop :: (ToProperty p) => String -> p -> Spec
 prop = propWith defaultRunOptions
 
 -- | Variant that allows specifying Minithesis RunOptions.
-propWith :: RunOptions -> String -> (TestCase -> IO ()) -> Spec
-propWith opts name property = it name (runTest opts property)
+propWith :: (ToProperty p) => RunOptions -> String -> p -> Spec
+propWith base name propertyLike =
+  it name $ do
+    let propValue = toProperty propertyLike
+    opts <- resolveRunOptions (applyPropertyOptions base propValue)
+    runProperty opts propValue

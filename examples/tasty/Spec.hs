@@ -12,7 +12,7 @@ tests =
   testGroup
     "Examples with Tasty interface"
     [ testProperty "sorting twice equals sorting once" $ \tc -> do
-        xs <- any tc (lists (integers (-10) 10) (Just 0) (Just 20))
+        xs <- any tc $ lists (integers (-10) 10) (Just 0) (Just 20)
         sort (sort xs) @?= sort xs
     ]
 

@@ -4,14 +4,19 @@ module Minithesis.Tasty
   )
 where
 
-import Minithesis (RunOptions, TestCase, defaultRunOptions, runTest)
+import Minithesis.Property (ToProperty (..), applyPropertyOptions, runProperty)
+import Minithesis.Runner (RunOptions, defaultRunOptions, resolveRunOptions)
 import Test.Tasty (TestTree)
 import Test.Tasty.HUnit (testCase)
 
 -- | Modelled after Test.Tasty.QuickCheck.testProperty
-testProperty :: String -> (TestCase -> IO ()) -> TestTree
+testProperty :: (ToProperty p) => String -> p -> TestTree
 testProperty = testPropertyWith defaultRunOptions
 
 -- | Variant that allows specifying Minithesis RunOptions.
-testPropertyWith :: RunOptions -> String -> (TestCase -> IO ()) -> TestTree
-testPropertyWith opts name property = testCase name (runTest opts property)
+testPropertyWith :: (ToProperty p) => RunOptions -> String -> p -> TestTree
+testPropertyWith base name propertyLike =
+  testCase name $ do
+    let propValue = toProperty propertyLike
+    opts <- resolveRunOptions (applyPropertyOptions base propValue)
+    runProperty opts propValue

@@ -1,6 +1,8 @@
 module Minithesis.Runner
   ( RunOptions (..),
     defaultRunOptions,
+    resolveRunOptions,
+    resolveRunOptionsWith,
     runTest,
     weighted,
     TestDatabase (..),
@@ -35,9 +37,11 @@ import Minithesis.TestCase
     printIfNeeded,
   )
 import System.Directory (createDirectoryIfMissing, doesFileExist, removeFile)
+import System.Environment (lookupEnv)
 import System.FilePath ((</>))
 import qualified System.IO.Unsafe as Unsafe
 import System.Random (StdGen, mkStdGen, newStdGen, randomR)
+import Text.Read (readMaybe)
 import Prelude hiding (any)
 
 data RunOptions
@@ -86,6 +90,22 @@ defaultRunOptions =
       runDatabase = Nothing,
       runDatabaseKey = "default"
     }
+
+-- | Apply environment overrides (e.g. 'MINITHESIS_MAX_EXAMPLES') to options.
+resolveRunOptions :: RunOptions -> IO RunOptions
+resolveRunOptions opts = do
+  mMaxExamples <- lookupEnv "MINITHESIS_MAX_EXAMPLES"
+  pure $ maybe opts applyMaxExamples mMaxExamples
+  where
+    applyMaxExamples raw =
+      case readMaybe raw of
+        Just n | n > 0 -> opts {runMaxExamples = n}
+        _ -> opts
+
+-- | Convenience helper that applies a tweak to 'defaultRunOptions' before
+-- resolving environment overrides.
+resolveRunOptionsWith :: (RunOptions -> RunOptions) -> IO RunOptions
+resolveRunOptionsWith tweak = resolveRunOptions (tweak defaultRunOptions)
 
 data TestingState
   = TestingState

@@ -20,6 +20,7 @@ library
   hs-source-dirs: src
   exposed-modules:
       Minithesis,
+      Minithesis.Property,
       Minithesis.Hspec,
       Minithesis.Tasty
   other-modules:
