@@ -4,7 +4,6 @@ module Minithesis.Runner
     resolveRunOptions,
     resolveRunOptionsWith,
     runTest,
-    weighted,
     TestDatabase (..),
     TestDatabaseKey,
     directoryDatabase,
@@ -25,21 +24,21 @@ import Data.Word (Word64)
 import Minithesis.TestCase
   ( Status (..),
     StopTest (..),
-    TestCase (..),
+    TestCase,
     Unsatisfiable (..),
     finaliseStatus,
-    forChoicesWithPrinter,
+    getBounds,
     getChoices,
     getStatus,
+    getTargetingScore,
     markStatus,
     maxWord64,
-    newTestCaseWith,
-    printIfNeeded,
+    withChoicesWithPrinter,
+    withNewTestCaseWith,
   )
 import System.Directory (createDirectoryIfMissing, doesFileExist, removeFile)
 import System.Environment (lookupEnv)
 import System.FilePath ((</>))
-import qualified System.IO.Unsafe as Unsafe
 import System.Random (StdGen, mkStdGen, newStdGen, randomR)
 import Text.Read (readMaybe)
 import Prelude hiding (any)
@@ -119,7 +118,8 @@ data TestingState
     tsBestBounds :: IORef [Integer],
     tsQueue :: IORef [[Word64]],
     tsResult :: IORef (Maybe [Word64]),
-    tsTrivial :: IORef Bool
+    tsTrivial :: IORef Bool,
+    tsEvalCache :: IORef [([Word64], Status)]
   }
 
 bufferSize :: Int
@@ -140,6 +140,7 @@ runTest opts userFunction = do
   queueRef <- newIORef []
   resultRef <- newIORef Nothing
   trivialRef <- newIORef False
+  evalCacheRef <- newIORef []
   let state =
         TestingState
           { tsRandom = randomRef,
@@ -152,7 +153,8 @@ runTest opts userFunction = do
             tsBestBounds = bestBoundsRef,
             tsQueue = queueRef,
             tsResult = resultRef,
-            tsTrivial = trivialRef
+            tsTrivial = trivialRef,
+            tsEvalCache = evalCacheRef
           }
   loadFromDatabase state
   runGeneration state
@@ -168,10 +170,12 @@ runTest opts userFunction = do
   storeToDatabase opts mRes
   case mRes of
     Nothing -> pure ()
-    Just choices -> do
-      tc <- forChoicesWithPrinter choices (not (runQuiet opts)) (runPrinter opts)
-      -- Replay without catching user exceptions so they propagate
-      userFunction tc
+    Just choices ->
+      withChoicesWithPrinter
+        choices
+        (not (runQuiet opts))
+        (runPrinter opts)
+        userFunction
 
 loadFromDatabase :: TestingState -> IO ()
 loadFromDatabase state =
@@ -184,9 +188,9 @@ loadFromDatabase state =
         Nothing -> pure ()
         Just payload -> do
           let replayChoices = decodeChoices payload
-          tc <- forChoicesWithPrinter replayChoices False (const (pure ()))
-          _ <- executeTestCase state tc
-          pure ()
+          withChoicesWithPrinter replayChoices False (const (pure ())) $ \tc -> do
+            _ <- executeTestCase state tc
+            pure ()
 
 storeToDatabase :: RunOptions -> Maybe [Word64] -> IO ()
 storeToDatabase opts mRes =
@@ -197,27 +201,6 @@ storeToDatabase opts mRes =
        in case mRes of
             Nothing -> dbDelete db key
             Just choices -> dbInsert db key (encodeChoices choices)
-
-weighted :: TestCase -> Double -> IO Bool
-weighted tc p
-  | p <= 0 = do
-      printIfNeeded tc $ "weighted(" ++ show p ++ "): False"
-      pure False
-  | p >= 1 = do
-      printIfNeeded tc $ "weighted(" ++ show p ++ "): True"
-      pure True
-  | otherwise =
-      case tcRandom tc of
-        Nothing -> do
-          printIfNeeded tc $ "weighted(" ++ show p ++ "): False"
-          pure False
-        Just ref -> do
-          gen <- readIORef ref
-          let (x, nextGen) = randomR (0.0, 1.0 :: Double) gen
-              res = x < p
-          writeIORef ref nextGen
-          printIfNeeded tc $ "weighted(" ++ show p ++ "): " ++ show res
-          pure res
 
 runGeneration :: TestingState -> IO ()
 runGeneration state = do
@@ -240,14 +223,16 @@ runGeneration state = do
             (p : ps) -> (p, ps)
       writeIORef (tsQueue state) restQ
       -- Suppress printing during generation; only print on final replay.
-      testCase <-
-        newTestCaseWith
-          prefixToUse
-          (Just (tsRandom state))
-          (Just (runBufferSize (tsOptions state)))
-          False
-          (runPrinter opts)
-      _ <- executeTestCase state testCase
+      withNewTestCaseWith
+        prefixToUse
+        (Just (tsRandom state))
+        (Just (runBufferSize (tsOptions state)))
+        False
+        (runPrinter opts)
+        ( \testCase -> do
+            _ <- executeTestCase state testCase
+            pure ()
+        )
       runGeneration state
 
 executeTestCase :: TestingState -> TestCase -> IO Status
@@ -282,13 +267,13 @@ executeTestCase state testCase = do
 
 updateTargeting :: TestingState -> TestCase -> IO ()
 updateTargeting state tc = do
-  mScore <- readIORef (tcTargetingScore tc)
+  mScore <- getTargetingScore tc
   case mScore of
     Nothing -> pure ()
     Just sc -> do
       best <- readIORef (tsBestScore state)
       choices <- getChoices tc
-      bounds <- readIORef (tcBounds tc)
+      bounds <- getBounds tc
       bestChoices <- readIORef (tsBestChoices state)
       let improve = maybe True (sc >) best
       when improve $ do
@@ -357,22 +342,22 @@ targetOptimisation state = do
                         then pure False
                         else do
                           let candidate = replaceAt choices idx (fromInteger newVal)
-                          tc <- forChoicesWithPrinter candidate False (runPrinter opts)
-                          _ <- executeTestCase state tc
-                          newScoreM <- readIORef (tsBestScore state)
-                          case newScoreM of
-                            Nothing -> pure False
-                            Just newScore -> do
-                              oldScore <- readIORef scoreRef
-                              if newScore > oldScore
-                                then do
-                                  writeIORef scoreRef newScore
-                                  newChoices <- readIORef (tsBestChoices state)
-                                  newBounds <- readIORef (tsBestBounds state)
-                                  writeIORef choicesRef newChoices
-                                  writeIORef boundsRef newBounds
-                                  pure True
-                                else pure False
+                          withChoicesWithPrinter candidate False (runPrinter opts) $ \tc -> do
+                            _ <- executeTestCase state tc
+                            newScoreM <- readIORef (tsBestScore state)
+                            case newScoreM of
+                              Nothing -> pure False
+                              Just newScore -> do
+                                oldScore <- readIORef scoreRef
+                                if newScore > oldScore
+                                  then do
+                                    writeIORef scoreRef newScore
+                                    newChoices <- readIORef (tsBestChoices state)
+                                    newBounds <- readIORef (tsBestBounds state)
+                                    writeIORef choicesRef newChoices
+                                    writeIORef boundsRef newBounds
+                                    pure True
+                                  else pure False
             tryDirections :: Int -> IO Integer
             tryDirections idx = do
               improvedPos <- adjust idx 1
@@ -431,7 +416,7 @@ shrinkResult :: TestingState -> IO ()
 shrinkResult state = do
   -- Clear cross-test cached evaluations to avoid stale results influencing
   -- shrinking decisions for the current test function.
-  writeIORef evalCache []
+  writeIORef (tsEvalCache state) []
   mRes <- readIORef (tsResult state)
   case mRes of
     Nothing -> pure ()
@@ -557,32 +542,28 @@ binSearchDown lo hi f = do
           if ok then go l mid else go mid h
 
 -- Cached evaluator of a choice sequence against the current test function
-{-# NOINLINE evalCache #-}
-evalCache :: IORef [([Word64], Status)]
-evalCache = Unsafe.unsafePerformIO (newIORef [])
-
 cachedEvaluate :: TestingState -> [Word64] -> IO Status
 cachedEvaluate state choices = do
-  cache <- readIORef evalCache
+  cache <- readIORef (tsEvalCache state)
   case lookup choices cache of
     Just st -> pure st
     Nothing -> do
       let printer = runPrinter (tsOptions state)
-      tc <- forChoicesWithPrinter choices False printer
-      -- Run and capture status; catch exceptions and mark interesting if needed
-      r <- try (tsTestFunction state tc) :: IO (Either SomeException ())
-      case r of
-        Left _ -> do
-          m <- getStatus tc
-          case m of
-            Nothing -> do
-              _ <- try (markStatus tc Interesting) :: IO (Either StopTest ())
-              pure ()
-            Just _ -> pure ()
-        Right _ -> pure ()
-      st <- finaliseStatus tc
-      modifyIORef' evalCache ((choices, st) :)
-      pure st
+      withChoicesWithPrinter choices False printer $ \tc -> do
+        -- Run and capture status; catch exceptions and mark interesting if needed
+        r <- try (tsTestFunction state tc) :: IO (Either SomeException ())
+        case r of
+          Left _ -> do
+            m <- getStatus tc
+            case m of
+              Nothing -> do
+                _ <- try (markStatus tc Interesting) :: IO (Either StopTest ())
+                pure ()
+              Just _ -> pure ()
+          Right _ -> pure ()
+        st <- finaliseStatus tc
+        modifyIORef' (tsEvalCache state) ((choices, st) :)
+        pure st
 
 encodeChoices :: [Word64] -> BS.ByteString
 encodeChoices = BL.toStrict . Builder.toLazyByteString . foldMap Builder.word64BE

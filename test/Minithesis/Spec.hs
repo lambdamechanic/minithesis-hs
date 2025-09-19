@@ -12,17 +12,17 @@ import Prelude hiding (any)
 
 spec :: Spec
 spec = do
-  describe "TestCase.forChoices" $ do
+  describe "TestCase.withChoices" $ do
     it "raises Frozen when interacting with a completed test case" $ do
-      tc <- forChoices [0] False
-      setStatus tc Valid
-      markStatus tc Interesting `shouldThrow` isFrozen
-      choice tc 10 `shouldThrow` isFrozen
-      forcedChoice tc 10 `shouldThrow` isFrozen
+      withChoices [0] False $ \tc -> do
+        setStatus tc Valid
+        markStatus tc Interesting `shouldThrow` isFrozen
+        choice tc 10 `shouldThrow` isFrozen
+        forcedChoice tc 10 `shouldThrow` isFrozen
   describe "TestCase.choice" $ do
     it "rejects bounds that exceed 64 bits" $ do
-      tc <- forChoices [] False
-      choice tc (2 ^ (64 :: Integer)) `shouldThrow` isValueError
+      withChoices [] False $ \tc ->
+        choice tc (2 ^ (64 :: Integer)) `shouldThrow` isValueError
   describe "runTest" $ do
     it "can choose the full 64-bit range" $ do
       runWithOptions_ (\o -> o {runQuiet = True}) $ \tc -> do
@@ -53,9 +53,9 @@ spec = do
     it "prints a top-level weighted" $ do
       logsRef <- newIORef []
       let collect msg = modifyIORef' logsRef (++ [msg])
-      tc <- forChoicesWithPrinter [] True collect
-      res <- weighted tc 0.5
-      res `shouldBe` False
+      withChoicesWithPrinter [] True collect $ \tc -> do
+        res <- weighted tc 0.5
+        res `shouldBe` False
       readIORef logsRef `shouldReturn` ["weighted(0.5): False"]
 
     it "impossible weighted still allows later Failure" $ do
@@ -89,8 +89,8 @@ spec = do
 
   describe "TestCase.forcedChoice" $ do
     it "rejects bounds that exceed 64 bits" $ do
-      tc <- forChoices [] False
-      forcedChoice tc (2 ^ (64 :: Integer)) `shouldThrow` isValueError
+      withChoices [] False $ \tc ->
+        forcedChoice tc (2 ^ (64 :: Integer)) `shouldThrow` isValueError
 
   describe "generators" $ do
     it "size bounds on list" $ do

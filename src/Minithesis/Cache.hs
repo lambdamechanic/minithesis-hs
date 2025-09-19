@@ -12,10 +12,10 @@ import Minithesis.TestCase
     StopTest,
     TestCase,
     finaliseStatus,
-    forChoicesWithPrinter,
     getChoices,
     getStatus,
     markStatus,
+    withChoicesWithPrinter,
   )
 
 cachedTestFunction :: (TestCase -> IO ()) -> IO ([Word64] -> IO Status)
@@ -26,19 +26,21 @@ cachedTestFunction testFn = do
     case cacheLookup cache choices of
       Just st -> pure st
       Nothing -> do
-        tc <- forChoicesWithPrinter choices False (const (pure ()))
-        r <- try (testFn tc) :: IO (Either SomeException ())
-        case r of
-          Left _ -> do
-            m <- getStatus tc
-            case m of
-              Nothing -> do
-                _ <- try (markStatus tc Interesting) :: IO (Either StopTest ())
-                pure ()
-              Just _ -> pure ()
-          Right _ -> pure ()
-        st <- finaliseStatus tc
-        recorded <- getChoices tc
+        (st, recorded) <-
+          withChoicesWithPrinter choices False (const (pure ())) $ \tc -> do
+            r <- try (testFn tc) :: IO (Either SomeException ())
+            case r of
+              Left _ -> do
+                m <- getStatus tc
+                case m of
+                  Nothing -> do
+                    _ <- try (markStatus tc Interesting) :: IO (Either StopTest ())
+                    pure ()
+                  Just _ -> pure ()
+              Right _ -> pure ()
+            status <- finaliseStatus tc
+            recordedChoices <- getChoices tc
+            pure (status, recordedChoices)
         modifyIORef' cacheRef (\tree -> cacheInsert tree recorded st)
         pure st
 
