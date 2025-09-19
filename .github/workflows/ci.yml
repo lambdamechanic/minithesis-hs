@@ -56,7 +56,7 @@ jobs:
         run: |
           cabal build all --enable-tests --enable-per-component
 
-      - name: Run tests with coverage-for library only (Hspec)
+      - name: Run tests with coverage-for library only (Sydtest profile)
         env:
           HSPEC_OPTIONS: "--no-color"
         run: |
@@ -70,12 +70,31 @@ jobs:
             UNIT_ID=$(jq -r '."install-plan"[] | select(."pkg-name" == "minithesis" and ."component-name" == "lib") | ."id"' dist-newstyle/cache/plan.json)
           fi
           echo "Using cabal --coverage-for=${UNIT_ID}"
-          cabal test minithesis-hspec --enable-coverage --enable-per-component --coverage-for="${UNIT_ID}" --test-show-details=streaming
+          cabal test minithesis-test \
+            --enable-coverage \
+            --enable-per-component \
+            --coverage-for="${UNIT_ID}" \
+            --test-show-details=streaming \
+            --test-options="--profile"
 
-      - name: Run Tasty tests without color
+      - name: Upload sydtest profile
+        if: always() && hashFiles('sydtest-profile.html') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: sydtest-profile
+          path: sydtest-profile.html
+
+      - name: Run CI-only example tests (Hspec)
+        env:
+          HSPEC_OPTIONS: "--no-color"
         run: |
           set -euo pipefail
-          cabal test minithesis-tasty --test-options='--color=never' --test-show-details=streaming
+          cabal test -f ci-tests examples-hspec --test-show-details=streaming
+
+      - name: Run CI-only example tests (Tasty)
+        run: |
+          set -euo pipefail
+          cabal test -f ci-tests examples-tasty --test-options='--color=never' --test-show-details=streaming
 
       - name: Cabal check
         run: cabal check
