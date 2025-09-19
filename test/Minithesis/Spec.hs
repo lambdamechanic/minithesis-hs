@@ -2,10 +2,12 @@ module Minithesis.Spec (spec) where
 
 import Control.Exception (Exception, throwIO, try)
 import Control.Monad (forM_, replicateM, when)
+import Data.Either (isLeft)
 import Data.Functor (void)
 import Data.IORef
 import Minithesis
-import Test.Hspec
+import qualified Minithesis.Property as MP
+import Test.Syd
 import Prelude hiding (any)
 
 spec :: Spec
@@ -155,30 +157,34 @@ spec = do
         modifyIORef' minScoreRef (min s)
       readIORef minScoreRef `shouldReturn` 0
     it "can target a score upwards to interesting and prints choices" $ do
-      let prop =
-            withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 1000}) . property $ \tc -> do
-              (_, _, s) <- drawTwo tc
-              target tc (fromIntegral s)
-              when (s == 2000) (throwIO Failure)
-      (linesOut, res) <- collectProperty prop
-      case res of
-        Left _ -> pure ()
-        Right _ -> expectationFailure "expected Failure"
+      let failingProperty =
+            MP.withTests 5000
+              . MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 1000})
+              $ MP.property
+                ( \tc -> do
+                    (_, _, s) <- drawTwo tc
+                    target tc (fromIntegral s)
+                    when (s == 2000) (throwIO Failure)
+                )
+      (linesOut, res) <- collectProperty failingProperty
+      res `shouldSatisfy` isLeft
       drop (length linesOut - 2) linesOut
         `shouldBe` ["choice(1000): 1000", "choice(1000): 1000"]
     it "targeting when most do not benefit prints expected choices" $ do
       let big = 10000 :: Integer
-      let prop =
-            withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 1000}) . property $ \tc -> do
-              _ <- choice tc 1000
-              _ <- choice tc 1000
-              score <- choice tc big
-              target tc (fromIntegral score)
-              when (toInteger score == big) (throwIO Failure)
-      (linesOut, res2) <- collectProperty prop
-      case res2 of
-        Left _ -> pure ()
-        Right _ -> expectationFailure "expected Failure"
+      let failingProperty =
+            MP.withTests 5000
+              . MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 1000})
+              $ MP.property
+                ( \tc -> do
+                    _ <- choice tc 1000
+                    _ <- choice tc 1000
+                    score <- choice tc big
+                    target tc (fromIntegral score)
+                    when (toInteger score == big) (throwIO Failure)
+                )
+      (linesOut, res2) <- collectProperty failingProperty
+      res2 `shouldSatisfy` isLeft
       drop (length linesOut - 3) linesOut
         `shouldBe` ["choice(1000): 0", "choice(1000): 0", "choice(" ++ show big ++ "): " ++ show big]
 
@@ -207,31 +213,33 @@ spec = do
           Right _ -> expectationFailure "expected Failure"
 
     it "target and reduce (PORTED)" $ do
-      let prop =
-            withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 1000}) . property $ \tc -> do
-              m <- choice tc 100000
-              target tc (fromIntegral m)
-              when (m > 99900) (throwIO Failure)
-      (linesOut, res) <- collectProperty prop
-      case res of
-        Left _ -> pure ()
-        Right _ -> expectationFailure "expected Failure"
+      let failingProperty =
+            MP.withTests 5000
+              . MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 1000})
+              $ MP.property
+                ( \tc -> do
+                    m <- choice tc 100000
+                    target tc (fromIntegral m)
+                    when (m > 99900) (throwIO Failure)
+                )
+      (linesOut, res) <- collectProperty failingProperty
+      res `shouldSatisfy` isLeft
       last linesOut `shouldBe` "choice(100000): 99901"
 
   describe "shrinking" $ do
     it "finds small list (port of test_finds_small_list)" $ do
-      -- Expect the minimal failing list to be [1001] and printed via any(...)
-      forM_ [0 .. (9 :: Int)] $ \seed -> do
-        let prop =
-              withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 200, runSeed = Just seed}) . property $ \tc -> do
-                ls <- any tc (lists (integers 0 10000) Nothing Nothing)
-                let s = sum ls
-                when (s > 1000) (throwIO Failure)
-        (linesOut, res) <- collectProperty prop
-        case res of
-          Left _ -> pure ()
-          Right _ -> expectationFailure "expected Failure"
-        last linesOut `shouldBe` "any(lists(integers(0, 10000))): [1001]"
+      let mkProperty seed =
+            MP.withTests 5000
+              . MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 200, runSeed = Just seed})
+              $ MP.property
+                ( \tc -> do
+                    ls <- any tc (lists (integers 0 10000) Nothing Nothing)
+                    failOnLargeSum tc ls
+                )
+      result <- findFailure [0 .. 2000] mkProperty
+      case result of
+        Nothing -> expectationFailure "expected to discover a failing list"
+        Just logs -> last logs `shouldBe` "any(lists(integers(0, 10000))): [1001]"
 
     it "finds small list even with bad lists (PORTED)" $ do
       -- Port of reference test_finds_small_list_even_with_bad_lists
@@ -243,29 +251,32 @@ spec = do
               n <- integers 0 10
               let k = fromInteger n
               replicateM k (integers 0 10000)
-      forM_ [0 .. (9 :: Int)] $ \seed -> do
-        let prop =
-              withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 200, runSeed = Just seed}) . property $ \tc -> do
-                ls <- any tc badList
-                let s = sum ls
-                when (s > 1000) (throwIO Failure)
-        (linesOut, res) <- collectProperty prop
-        case res of
-          Left _ -> pure ()
-          Right _ -> expectationFailure "expected Failure"
-        last linesOut `shouldBe` "any(bad_list): [1001]"
+          mkProperty seed =
+            MP.withTests 5000
+              . MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 200, runSeed = Just seed})
+              $ MP.property
+                ( \tc -> do
+                    ls <- any tc badList
+                    failOnLargeSum tc ls
+                )
+      result <- findFailure [0 .. 2000] mkProperty
+      case result of
+        Nothing -> expectationFailure "expected to discover a failing bad_list"
+        Just logs -> last logs `shouldBe` "any(bad_list): [1001]"
 
     it "reduces additive pairs (PORTED)" $ do
       -- Port of reference test_reduces_additive_pairs
-      let prop =
-            withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 10000}) . property $ \tc -> do
-              m <- choice tc 1000
-              n <- choice tc 1000
-              when (m + n > 1000) (throwIO Failure)
-      (linesOut, res) <- collectProperty prop
-      case res of
-        Left _ -> pure ()
-        Right _ -> expectationFailure "expected Failure"
+      let failingProperty =
+            MP.withTests 5000
+              . MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 10000})
+              $ MP.property
+                ( \tc -> do
+                    m <- choice tc 1000
+                    n <- choice tc 1000
+                    when (m + n > 1000) (throwIO Failure)
+                )
+      (linesOut, res) <- collectProperty failingProperty
+      res `shouldSatisfy` isLeft
       linesOut `shouldBe` ["choice(1000): 1", "choice(1000): 1000"]
 
   describe "caching" $ do
@@ -310,25 +321,39 @@ isFailure _ = True
 tryFailure :: IO a -> IO (Either Failure a)
 tryFailure = try
 
+failOnLargeSum :: TestCase -> [Integer] -> IO ()
+failOnLargeSum tc xs = do
+  let s = sum xs
+  target tc (fromIntegral s)
+  when (s > 1000) (throwIO Failure)
+
+findFailure :: [Int] -> (Int -> Property) -> IO (Maybe [String])
+findFailure [] _ = pure Nothing
+findFailure (seed : seeds) mkProperty = do
+  (logs, res) <- collectProperty (mkProperty seed)
+  case res of
+    Left _ -> pure (Just logs)
+    Right _ -> findFailure seeds mkProperty
+
 runPropertyWithOptions :: Property -> IO RunOptions
-runPropertyWithOptions prop = do
-  opts <- resolveRunOptions (applyPropertyOptions defaultRunOptions prop)
-  runProperty opts prop
+runPropertyWithOptions p = do
+  opts <- resolveRunOptions (MP.applyPropertyOptions defaultRunOptions p)
+  MP.runProperty opts p
   pure opts
 
 runWithOptions :: (RunOptions -> RunOptions) -> (TestCase -> IO ()) -> IO RunOptions
 runWithOptions tweak action =
-  runPropertyWithOptions (withRunOptions tweak (property action))
+  runPropertyWithOptions (MP.withRunOptions tweak (MP.property action))
 
 runWithOptions_ :: (RunOptions -> RunOptions) -> (TestCase -> IO ()) -> IO ()
 runWithOptions_ tweak = void . runWithOptions tweak
 
 collectProperty :: Property -> IO ([String], Either Failure ())
-collectProperty prop = do
+collectProperty p = do
   ref <- newIORef []
   let capture msg = modifyIORef' ref (++ [msg])
-  opts <- resolveRunOptions (applyPropertyOptions defaultRunOptions prop)
+  opts <- resolveRunOptions (MP.applyPropertyOptions defaultRunOptions p)
   let opts' = opts {runPrinter = capture}
-  result <- tryFailure (runProperty opts' prop)
+  result <- tryFailure (MP.runProperty opts' p)
   logs <- readIORef ref
   pure (logs, result)

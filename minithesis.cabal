@@ -53,9 +53,7 @@ test-suite minithesis-test
       base,
       minithesis,
       directory,
-      hspec >=2.10,
-      sydtest >=0.18,
-      sydtest-hspec >=0.4
+      sydtest >=0.18
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
 
 -- CI-only example suites
