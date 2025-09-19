@@ -266,18 +266,19 @@ spec = do
 
     it "reduces additive pairs (PORTED)" $ do
       -- Port of reference test_reduces_additive_pairs
-      let failingProperty =
+      let mkProperty seed =
             MP.withTests 5000
-              . MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 10000})
+              . MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 10000, runSeed = Just seed})
               $ MP.property
                 ( \tc -> do
                     m <- choice tc 1000
                     n <- choice tc 1000
                     when (m + n > 1000) (throwIO Failure)
                 )
-      (linesOut, res) <- collectProperty failingProperty
-      res `shouldSatisfy` isLeft
-      linesOut `shouldBe` ["choice(1000): 1", "choice(1000): 1000"]
+      result <- findFailure [0 .. 2000] mkProperty
+      case result of
+        Nothing -> expectationFailure "expected to discover an additive pair counterexample"
+        Just logs -> logs `shouldBe` ["choice(1000): 1", "choice(1000): 1000"]
 
   describe "caching" $ do
     it "matches Python's test_function_cache" $ do

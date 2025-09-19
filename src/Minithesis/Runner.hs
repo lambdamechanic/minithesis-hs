@@ -440,42 +440,55 @@ shrinkResult state = do
             st <- cachedEvaluate state cand
             pure (st == Interesting)
           deleteChunks xs = do
-            let tryK k cur = do
-                  go (length cur - k - 1) cur
-                  where
-                    go i best =
-                      if i < 0
-                        then pure best
-                        else do
-                          -- Attempt to delete a window of size k starting at i.
-                          -- If we are deleting choices after the first index,
-                          -- also reduce the first choice (commonly a size/length)
-                          -- by up to k to keep structures like lists consistent.
-                          let baseCand = take i best ++ drop (i + k) best
-                              cand =
-                                if i > 0 && not (null best)
-                                  then
-                                    let len0 = case best of
-                                          [] -> 0
-                                          (x : _) -> fromIntegral x
-                                        dec = min k len0
-                                        new0 = fromIntegral (len0 - dec)
-                                     in replaceAt baseCand 0 new0
-                                  else baseCand
-                          ok <- if i + k <= length best then consider cand else pure False
-                          go (i - 1) (if ok then cand else best)
+            let tryK k cur =
+                  let go i best
+                        | i < 0 = pure best
+                        | otherwise = do
+                            let baseCand = take i best ++ drop (i + k) best
+                                cand =
+                                  if i > 0 && not (null best)
+                                    then
+                                      let len0 = case best of
+                                            [] -> 0
+                                            (x : _) -> fromIntegral x
+                                          dec = min k len0
+                                          new0 = fromIntegral (len0 - dec)
+                                       in replaceAt baseCand 0 new0
+                                    else baseCand
+                            ok <- if i + k <= length best then consider cand else pure False
+                            go (i - 1) (if ok then cand else best)
+                   in go (length cur - k - 1) cur
             foldM' xs [8, 7, 6, 5, 4, 3, 2, 1] tryK
+          zeroBlocks xs = do
+            let tryK k cur =
+                  let go i best
+                        | i < 0 = pure best
+                        | otherwise = do
+                            let cand = take i best ++ replicate k 0 ++ drop (i + k) best
+                            ok <- consider cand
+                            if ok
+                              then go (i - k) cand
+                              else go (i - 1) best
+                   in go (length cur - k) cur
+            foldM' xs [8, 7 .. 2] tryK
+          minimizeEach xs =
+            let go i best
+                  | i < 0 = pure best
+                  | otherwise = do
+                      let hi = best !! i
+                      v <- binSearchDown 0 hi $ \v -> consider (replaceAt best i v)
+                      go (i - 1) (replaceAt best i v)
+             in go (length xs - 1) xs
           sortWindows xs = do
-            let tryK k cur = do
-                  let go i best =
-                        if i < 0
-                          then pure best
-                          else do
+            let tryK k cur =
+                  let go i best
+                        | i < 0 = pure best
+                        | otherwise = do
                             let seg = take k (drop i best)
                                 cand = take i best ++ L.sort seg ++ drop (i + k) best
                             ok <- consider cand
                             go (i - 1) (if ok then cand else best)
-                  go (length cur - k - 1) cur
+                   in go (length cur - k - 1) cur
             foldM' xs [8, 7 .. 2] tryK
           chooseIfTrue cand best = do
             ok <- consider cand
@@ -503,35 +516,13 @@ shrinkResult state = do
                               else go (i - 1) best1
                   go (length cur - 1 - k) cur
             step 2 xs >>= step 1
-          -- Minimize each coordinate independently while preserving Interesting,
-          -- prioritizing earlier coordinates first for lexicographic minimality.
-          minimizeEach xs = do
-            let go i best =
-                  if i >= length best
-                    then pure best
-                    else do
-                      let hi = best !! i
-                      v <- binSearchDown 0 hi $ \v -> consider (replaceAt best i v)
-                      let cand = replaceAt best i v
-                      best' <- chooseIfTrue cand best
-                      go (i + 1) best'
-            go 0 xs
-          -- Prefer canonicalizing two-element additive pairs to lexicographic
-          -- minimal form when possible, e.g. (2,999) -> (1,1000).
-          normalizePair best =
-            case best of
-              a : b : _
-                | a > 0 -> do
-                    let cand = replaceAt (replaceAt best 0 1) 1 (b + (a - 1))
-                    chooseIfTrue cand best
-              _ -> pure best
           loop prev = do
             improved1 <- deleteChunks prev
-            improved2 <- sortWindows improved1
-            improved2a <- normalizePair improved2
-            improved3 <- redistributePairs improved2a
-            improved4 <- minimizeEach improved3
-            if improved4 == prev then pure prev else loop improved4
+            improved2 <- zeroBlocks improved1
+            improved3 <- minimizeEach improved2
+            improved4 <- sortWindows improved3
+            improved5 <- redistributePairs improved4
+            if improved5 == prev then pure prev else loop improved5
       res <- loop res0
       writeIORef (tsResult state) (Just res)
 
