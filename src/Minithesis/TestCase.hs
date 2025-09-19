@@ -92,8 +92,8 @@ forChoices prefix printResults =
   forChoicesWithPrinter prefix printResults putStrLn
 
 forChoicesWithPrinter :: [Word64] -> Bool -> (String -> IO ()) -> IO TestCase
-forChoicesWithPrinter prefix printResults =
-  newTestCaseWith prefix Nothing (Just (length prefix)) printResults
+forChoicesWithPrinter prefix =
+  newTestCaseWith prefix Nothing (Just (length prefix))
 
 newTestCase :: StdGen -> Int -> Bool -> IO TestCase
 newTestCase gen maxSize printResults = do

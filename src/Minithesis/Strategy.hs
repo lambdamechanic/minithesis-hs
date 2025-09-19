@@ -16,6 +16,7 @@ import Control.Exception (throwIO)
 import Control.Monad (replicateM, when)
 import Data.IORef (modifyIORef')
 import qualified Data.List as L
+import Data.Maybe (fromMaybe)
 import Minithesis.TestCase
   ( TestCase (..),
     ValueError (..),
@@ -87,8 +88,8 @@ lists :: (Show a) => Strategy a -> Maybe Int -> Maybe Int -> Strategy [a]
 lists (Strategy elemS name _) minSize maxSize =
   Strategy
     ( \tc -> do
-        let lo = max 0 (fromMaybeZero minSize)
-            hi = max lo (fromMaybeDefault (lo + 10) maxSize)
+        let lo = max 0 (fromMaybe 0 minSize)
+            hi = max lo (fromMaybe (lo + 10) maxSize)
             spanN = fromIntegral (hi - lo) :: Integer
         k <- choice tc spanN
         let len = lo + fromIntegral k
@@ -96,12 +97,6 @@ lists (Strategy elemS name _) minSize maxSize =
     )
     ("lists(" ++ name ++ ")")
     (Just show)
-
-fromMaybeZero :: Maybe Int -> Int
-fromMaybeZero = maybe 0 id
-
-fromMaybeDefault :: Int -> Maybe Int -> Int
-fromMaybeDefault def = maybe def id
 
 -- | Pair strategy combining two strategies.
 tuples :: Strategy a -> Strategy b -> Strategy (a, b)
@@ -121,7 +116,7 @@ just x = Strategy (\_ -> pure x) "just" Nothing
 
 -- | Strategy that always rejects, forcing Unsatisfiable at the run level.
 nothing :: Strategy a
-nothing = Strategy (\tc -> reject tc) "nothing" Nothing
+nothing = Strategy reject "nothing" Nothing
 
 -- | Choose from a non-empty list of strategies. Empty list rejects.
 mixOf :: [Strategy a] -> Strategy a
