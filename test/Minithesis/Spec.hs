@@ -158,9 +158,8 @@ spec = do
       readIORef minScoreRef `shouldReturn` 0
     it "can target a score upwards to interesting and prints choices" $ do
       let failingProperty =
-            MP.withTests 5000
-              . MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 1000})
-              $ MP.property
+            MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 1000}) $
+              MP.property
                 ( \tc -> do
                     (_, _, s) <- drawTwo tc
                     target tc (fromIntegral s)
@@ -173,9 +172,8 @@ spec = do
     it "targeting when most do not benefit prints expected choices" $ do
       let big = 10000 :: Integer
       let failingProperty =
-            MP.withTests 5000
-              . MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 1000})
-              $ MP.property
+            MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 1000}) $
+              MP.property
                 ( \tc -> do
                     _ <- choice tc 1000
                     _ <- choice tc 1000
@@ -214,9 +212,8 @@ spec = do
 
     it "target and reduce (PORTED)" $ do
       let failingProperty =
-            MP.withTests 5000
-              . MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 1000})
-              $ MP.property
+            MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 1000}) $
+              MP.property
                 ( \tc -> do
                     m <- choice tc 100000
                     target tc (fromIntegral m)
@@ -229,9 +226,8 @@ spec = do
   describe "shrinking" $ do
     it "finds small list (port of test_finds_small_list)" $ do
       let mkProperty seed =
-            MP.withTests 5000
-              . MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 200, runSeed = Just seed})
-              $ MP.property
+            MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 200, runSeed = Just seed}) $
+              MP.property
                 ( \tc -> do
                     ls <- any tc (lists (integers 0 10000) Nothing Nothing)
                     failOnLargeSum tc ls
@@ -252,9 +248,8 @@ spec = do
               let k = fromInteger n
               replicateM k (integers 0 10000)
           mkProperty seed =
-            MP.withTests 5000
-              . MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 200, runSeed = Just seed})
-              $ MP.property
+            MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 200, runSeed = Just seed}) $
+              MP.property
                 ( \tc -> do
                     ls <- any tc badList
                     failOnLargeSum tc ls
@@ -267,9 +262,8 @@ spec = do
     it "reduces additive pairs (PORTED)" $ do
       -- Port of reference test_reduces_additive_pairs
       let mkProperty seed =
-            MP.withTests 5000
-              . MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 10000, runSeed = Just seed})
-              $ MP.property
+            MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 10000, runSeed = Just seed}) $
+              MP.property
                 ( \tc -> do
                     m <- choice tc 1000
                     n <- choice tc 1000

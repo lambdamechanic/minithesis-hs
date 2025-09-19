@@ -11,6 +11,10 @@ category:           Testing
 build-type:         Simple
 extra-source-files: README.md, AGENTS.md, PLAN.md
 
+source-repository head
+  type: git
+  location: https://github.com/lambdamechanic/minithesis-hs.git
+
 common warnings
   default-language: Haskell2010
   ghc-options: -Wall -Wcompat -Wredundant-constraints
@@ -30,14 +34,14 @@ library
       Minithesis.TestCase
   build-depends:
       base >=4.14 && <5,
-      bytestring,
-      containers,
-      directory,
-      filepath,
+      bytestring >=0.10 && <0.13,
+      containers >=0.6 && <0.7,
+      directory >=1.3 && <1.4,
+      filepath >=1.4 && <1.5,
       random >=1.2 && <1.3,
-      hspec >=2.10,
-      tasty >=1.4,
-      tasty-hunit >=0.10
+      hspec >=2.10 && <2.12,
+      tasty >=1.4 && <1.6,
+      tasty-hunit >=0.10 && <0.11
 
   default-extensions:
       ScopedTypeVariables
@@ -52,8 +56,8 @@ test-suite minithesis-test
   build-depends:
       base,
       minithesis,
-      directory,
-      sydtest >=0.18
+      directory >=1.3 && <1.4,
+      sydtest >=0.18 && <0.22
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
 
 -- CI-only example suites
@@ -74,7 +78,7 @@ test-suite examples-hspec
   build-depends:
       base,
       minithesis,
-      hspec >=2.10
+      hspec >=2.10 && <2.12
 
 test-suite examples-tasty
   import: warnings
@@ -86,5 +90,5 @@ test-suite examples-tasty
   build-depends:
       base,
       minithesis,
-      tasty,
-      tasty-hunit
+      tasty >=1.4 && <1.6,
+      tasty-hunit >=0.10 && <0.11
