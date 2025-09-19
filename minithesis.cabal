@@ -57,21 +57,6 @@ test-suite minithesis-hspec
       tasty,
       tasty-hspec
 
-test-suite minithesis-tasty
-  import: warnings
-  type: exitcode-stdio-1.0
-  hs-source-dirs: test-tasty, test
-  main-is: Spec.hs
-  other-modules:
-      Minithesis.Spec
-  build-depends:
-      base,
-      minithesis,
-      directory,
-      hspec >=2.10,
-      tasty,
-      tasty-hspec
-
 -- CI-only example suites
 flag ci-tests
   description: Enable CI-only example test suites
