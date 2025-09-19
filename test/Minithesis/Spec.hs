@@ -226,7 +226,7 @@ spec = do
   describe "shrinking" $ do
     it "finds small list (port of test_finds_small_list)" $ do
       let shrinkProperty =
-            MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 200, runSeed = Just 0}) $
+            MP.withRunOptions (\o -> o {runQuiet = False, runSeed = Just 0}) $
               MP.property
                 ( \tc -> do
                     ls <- any tc (lists (integers 0 10000) Nothing Nothing)
@@ -248,7 +248,7 @@ spec = do
               let k = fromInteger n
               replicateM k (integers 0 10000)
           shrinkBadListProperty =
-            MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 200, runSeed = Just 0}) $
+            MP.withRunOptions (\o -> o {runQuiet = False, runSeed = Just 0}) $
               MP.property
                 ( \tc -> do
                     ls <- any tc badList
