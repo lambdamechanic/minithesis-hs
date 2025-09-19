@@ -221,21 +221,21 @@ spec = do
                 )
       (linesOut, res) <- collectProperty failingProperty
       res `shouldSatisfy` isLeft
-      last linesOut `shouldBe` "choice(100000): 99901"
+      linesOut `shouldBe` ["choice(100000): 99901"]
 
   describe "shrinking" $ do
     it "finds small list (port of test_finds_small_list)" $ do
-      let mkProperty seed =
-            MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 200, runSeed = Just seed}) $
+      let shrinkProperty =
+            MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 200, runSeed = Just 0}) $
               MP.property
                 ( \tc -> do
                     ls <- any tc (lists (integers 0 10000) Nothing Nothing)
                     failOnLargeSum tc ls
                 )
-      result <- findFailure [0 .. 2000] mkProperty
-      case result of
-        Nothing -> expectationFailure "expected to discover a failing list"
-        Just logs -> last logs `shouldBe` "any(lists(integers(0, 10000))): [1001]"
+      (logs, res) <- collectProperty shrinkProperty
+      case res of
+        Left _ -> logs `shouldBe` ["any(lists(integers(0, 10000))): [1001]"]
+        Right _ -> expectationFailure "expected to discover a failing list"
 
     it "finds small list even with bad lists (PORTED)" $ do
       -- Port of reference test_finds_small_list_even_with_bad_lists
@@ -247,17 +247,17 @@ spec = do
               n <- integers 0 10
               let k = fromInteger n
               replicateM k (integers 0 10000)
-          mkProperty seed =
-            MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 200, runSeed = Just seed}) $
+          shrinkBadListProperty =
+            MP.withRunOptions (\o -> o {runQuiet = False, runMaxExamples = 200, runSeed = Just 0}) $
               MP.property
                 ( \tc -> do
                     ls <- any tc badList
                     failOnLargeSum tc ls
                 )
-      result <- findFailure [0 .. 2000] mkProperty
-      case result of
-        Nothing -> expectationFailure "expected to discover a failing bad_list"
-        Just logs -> last logs `shouldBe` "any(bad_list): [1001]"
+      (logs, res) <- collectProperty shrinkBadListProperty
+      case res of
+        Left _ -> logs `shouldBe` ["any(bad_list): [1001]"]
+        Right _ -> expectationFailure "expected to discover a failing bad_list"
 
     it "reduces additive pairs (PORTED)" $ do
       -- Port of reference test_reduces_additive_pairs
@@ -269,10 +269,10 @@ spec = do
                     n <- choice tc 1000
                     when (m + n > 1000) (throwIO Failure)
                 )
-      result <- findFailure [0 .. 2000] mkProperty
-      case result of
-        Nothing -> expectationFailure "expected to discover an additive pair counterexample"
-        Just logs -> logs `shouldBe` ["choice(1000): 1", "choice(1000): 1000"]
+      (logs, res) <- collectProperty (mkProperty 0)
+      case res of
+        Left _ -> logs `shouldBe` ["choice(1000): 1", "choice(1000): 1000"]
+        Right _ -> expectationFailure "expected to discover an additive pair counterexample"
 
   describe "caching" $ do
     it "matches Python's test_function_cache" $ do
@@ -321,14 +321,6 @@ failOnLargeSum tc xs = do
   let s = sum xs
   target tc (fromIntegral s)
   when (s > 1000) (throwIO Failure)
-
-findFailure :: [Int] -> (Int -> Property) -> IO (Maybe [String])
-findFailure [] _ = pure Nothing
-findFailure (seed : seeds) mkProperty = do
-  (logs, res) <- collectProperty (mkProperty seed)
-  case res of
-    Left _ -> pure (Just logs)
-    Right _ -> findFailure seeds mkProperty
 
 runPropertyWithOptions :: Property -> IO RunOptions
 runPropertyWithOptions p = do

@@ -13,3 +13,4 @@ dist-newstyle/
 cabal.project.local
 cabal.project.freeze
 .ghc.environment.*
+sydtest-profile.html

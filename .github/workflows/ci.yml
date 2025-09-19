@@ -56,7 +56,7 @@ jobs:
         run: |
           cabal build all --enable-tests --enable-per-component
 
-      - name: Run tests with coverage-for library only (Hspec)
+      - name: Run tests with coverage-for library only (Sydtest profile)
         env:
           HSPEC_OPTIONS: "--no-color"
         run: |
@@ -70,7 +70,19 @@ jobs:
             UNIT_ID=$(jq -r '."install-plan"[] | select(."pkg-name" == "minithesis" and ."component-name" == "lib") | ."id"' dist-newstyle/cache/plan.json)
           fi
           echo "Using cabal --coverage-for=${UNIT_ID}"
-          cabal test minithesis-test --enable-coverage --enable-per-component --coverage-for="${UNIT_ID}" --test-show-details=streaming
+          cabal test minithesis-test \
+            --enable-coverage \
+            --enable-per-component \
+            --coverage-for="${UNIT_ID}" \
+            --test-show-details=streaming \
+            --test-options="--profile"
+
+      - name: Upload sydtest profile
+        if: always() && hashFiles('sydtest-profile.html') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: sydtest-profile
+          path: sydtest-profile.html
 
       - name: Run CI-only example tests (Hspec)
         env:

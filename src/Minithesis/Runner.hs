@@ -441,23 +441,31 @@ shrinkResult state = do
             pure (st == Interesting)
           deleteChunks xs = do
             let tryK k cur =
-                  let go i best
+                  let start = length cur - k - 1
+                      go i best
                         | i < 0 = pure best
+                        | i >= length best = go (i - 1) best
+                        | i + k > length best = go (i - 1) best
                         | otherwise = do
-                            let baseCand = take i best ++ drop (i + k) best
-                                cand =
-                                  if i > 0 && not (null best)
-                                    then
-                                      let len0 = case best of
-                                            [] -> 0
-                                            (x : _) -> fromIntegral x
-                                          dec = min k len0
-                                          new0 = fromIntegral (len0 - dec)
-                                       in replaceAt baseCand 0 new0
-                                    else baseCand
-                            ok <- if i + k <= length best then consider cand else pure False
-                            go (i - 1) (if ok then cand else best)
-                   in go (length cur - k - 1) cur
+                            let attempt = take i best ++ drop (i + k) best
+                            ok <- consider attempt
+                            if ok
+                              then go i attempt
+                              else
+                                let prevIdx = i - 1
+                                 in if prevIdx >= 0 && prevIdx < length attempt
+                                      then do
+                                        let prevVal = attempt !! prevIdx
+                                        if prevVal > 0
+                                          then do
+                                            let attempt2 = replaceAt attempt prevIdx (prevVal - 1)
+                                            ok2 <- consider attempt2
+                                            if ok2
+                                              then go i attempt2
+                                              else go (i - 1) best
+                                          else go (i - 1) best
+                                      else go (i - 1) best
+                   in go start cur
             foldM' xs [8, 7, 6, 5, 4, 3, 2, 1] tryK
           zeroBlocks xs = do
             let tryK k cur =
