@@ -54,8 +54,8 @@ test-suite minithesis-hspec
       minithesis,
       directory,
       hspec >=2.10,
-      tasty,
-      tasty-hspec
+      sydtest >=0.18,
+      sydtest-hspec >=0.4
 
 -- CI-only example suites
 flag ci-tests
