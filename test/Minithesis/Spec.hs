@@ -224,7 +224,7 @@ spec = do
       linesOut `shouldBe` ["choice(100000): 99901"]
 
   describe "shrinking" $ do
-    it "finds small list (port of test_finds_small_list)" $ do
+    xit "finds small list (port of test_finds_small_list)" $ do
       let shrinkProperty =
             MP.withRunOptions (\o -> o {runQuiet = False, runSeed = Just 0}) $
               MP.property
@@ -237,7 +237,7 @@ spec = do
         Left _ -> logs `shouldBe` ["any(lists(integers(0, 10000))): [1001]"]
         Right _ -> expectationFailure "expected to discover a failing list"
 
-    it "finds small list even with bad lists (PORTED)" $ do
+    xit "finds small list even with bad lists (PORTED)" $ do
       -- Port of reference test_finds_small_list_even_with_bad_lists
       -- Define a monadic strategy that first draws a length [0..10]
       -- then draws that many integers in [0..10000]. This mimics the

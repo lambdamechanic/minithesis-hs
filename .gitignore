@@ -2,6 +2,7 @@
 .pytest_cache/
 __pycache__/
 .minithesis-cache.*
+.minithesis-hs-db/
 venv
 .pyc
 *.egg-info

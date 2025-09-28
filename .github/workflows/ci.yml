@@ -75,7 +75,8 @@ jobs:
             --enable-per-component \
             --coverage-for="${UNIT_ID}" \
             --test-show-details=streaming \
-            --test-options="--profile"
+            --test-options="--profile" \
+            --test-options="--jobs 1"
 
       - name: Upload sydtest profile
         if: always() && hashFiles('sydtest-profile.html') != ''
