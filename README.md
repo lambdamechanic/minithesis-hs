@@ -34,6 +34,10 @@ MINITHESIS_MAX_EXAMPLES=500 cabal test -fci-tests examples-hspec
 MINITHESIS_MAX_EXAMPLES=25 cabal test -fci-tests examples-tasty
 ```
 
+## Failure database
+
+Minithesis always runs with a failure database. Counterexamples are persisted to `.minithesis-hs-db/` by default so the next execution replays the shrunk choice sequence before exploring new examples. Override the location by supplying your own `directoryDatabase` via `withRunOptions` if you want to store entries elsewhere.
+
 ### Writing properties
 
 `Minithesis.Hspec.prop` and `Minithesis.Tasty.testProperty` accept either a raw `TestCase -> IO ()` function or the richer `Property` type. Use the helper `withTests` to override the number of examples from code while retaining environment overrides for quick experimentation.
