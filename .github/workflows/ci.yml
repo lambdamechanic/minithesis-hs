@@ -85,12 +85,17 @@ jobs:
           name: sydtest-profile
           path: sydtest-profile.html
 
-      - name: Run CI-only example tests (Hspec)
+      - name: Run CI-only example tests (Hspec, expect failure)
         env:
           HSPEC_OPTIONS: "--no-color"
         run: |
           set -euo pipefail
-          cabal test -f ci-tests examples-hspec --test-show-details=streaming
+          if cabal test -f ci-tests examples-hspec --test-show-details=streaming; then
+            echo "::error ::examples-hspec unexpectedly succeeded; update the expectation in CI"
+            exit 1
+          else
+            echo "examples-hspec failed as expected"
+          fi
 
       - name: Run CI-only example tests (Tasty)
         run: |

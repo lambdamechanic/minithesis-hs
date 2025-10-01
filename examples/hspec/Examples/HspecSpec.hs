@@ -16,4 +16,5 @@ spec = do
     MH.prop "sorting a uniqued list twice equals sorting once: should fail" $
       withTests 200 $ \tc -> do
         xs <- any tc $ lists (integers (-10) 10) (Just 0) (Just 20)
+        -- fails on duplicated element
         sort (sort xs) `shouldBe` sort (nub xs)
