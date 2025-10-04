@@ -14,7 +14,7 @@ Minithesis is a property-based testing toolkit with integrated shrinking and a t
 The repository is Cabal-first and ships a small Makefile helper:
 
 - `cabal build`
-- `make format` (runs `ormolu-0.7.7.0` over all tracked `.hs` files)
+- `make format` (runs `ormolu-0.8.0.2` over all tracked `.hs` files)
 - `hlint $(git ls-files '*.hs')`
 - `cabal test all --test-show-details=direct`
 - `cabal check`
@@ -46,7 +46,7 @@ The Hspec example in particular is short enough to inline here for quick referen
 The repository is Cabal-first and ships a small Makefile helper:
 
 - `cabal build`
-- `make format` (runs `ormolu-0.7.7.0` over all tracked `.hs` files)
+- `make format` (runs `ormolu-0.8.0.2` over all tracked `.hs` files)
 - `hlint $(git ls-files '*.hs')`
 - `cabal test all --test-show-details=direct`
 - `cabal check`

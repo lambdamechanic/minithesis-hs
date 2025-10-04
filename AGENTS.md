@@ -18,8 +18,8 @@
 - The `gh` CLI is available; use it for GitHub operations (e.g., opening PRs) when automation helps.
 
 ## Formatting
-- Ormolu version: we use `ormolu-0.7.7.0` in CI. Install it locally once so results match:
-  `cabal install ormolu-0.7.7.0`
+- Ormolu version: we use `ormolu-0.8.0.2` in CI. Install it locally once so results match:
+  `cabal install ormolu-0.8.0.2`
 - Run Ormolu in-place on all tracked Haskell files (explicit and CI-consistent):
   `cabal exec -- ormolu --mode inplace $(git ls-files '*.hs')`
 - `make format` runs the same command.
