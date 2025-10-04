@@ -22,7 +22,38 @@ Keep this document up to date as a living record of porting progress from the Py
 - ✅ test_errors_on_too_large_choice
 - ✅ test_test_cases_satisfy_preconditions
 - ✅ test_error_on_too_strict_precondition
+ - ✅ test_prints_a_top_level_weighted
+ - ✅ test_impossible_weighted
+ - ✅ test_guaranteed_weighted
+ - ✅ test_max_examples_is_not_exceeded
+ - ✅ test_forced_choice_bounds
+ - ✅ test_size_bounds_on_list
+- ✅ test_cannot_witness_nothing
+ - ✅ test_cannot_witness_empty_mix_of
+ - ✅ test_can_draw_mixture
+ - ✅ test_mapped_possibility
+ - ✅ test_selected_possibility
+ - ✅ test_bound_possibility
+ - ✅ test_can_target_a_score_upwards_without_failing
+ - ✅ test_can_target_a_score_downwards
+ - ✅ test_can_choose_full_64_bits
+ - ✅ test_error_on_unbounded_test_function
+- ✅ test_can_target_a_score_upwards_to_interesting
+- ✅ test_targeting_when_most_do_not_benefit
+- ✅ test_reduces_additive_pairs
+- ✅ test_reuses_results_from_the_database
+- ✅ test_function_cache
+- ✅ test_finds_a_local_maximum
+- ✅ test_target_and_reduce
+
+## Missing Python Tests To Port
+
+## Dropped Reference Tests
+- test_give_minithesis_a_workout
+- test_failure_from_hypothesis_1
+- test_failure_from_hypothesis_2
 
 ## Design Notes
 - Library module will be decomposed into `Minithesis.TestCase`, `Minithesis.State`, and generator modules as features land.
 - Hspec specs mirror `reference/test_minithesis.py`; keep sections aligned with their Python counterparts.
+- Exposed helper modules `Minithesis.Hspec` and `Minithesis.Tasty` wrap `runTest` for downstream libraries.

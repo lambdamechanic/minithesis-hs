@@ -11,6 +11,10 @@ category:           Testing
 build-type:         Simple
 extra-source-files: README.md, AGENTS.md, PLAN.md
 
+source-repository head
+  type: git
+  location: https://github.com/lambdamechanic/minithesis-hs.git
+
 common warnings
   default-language: Haskell2010
   ghc-options: -Wall -Wcompat -Wredundant-constraints
@@ -27,15 +31,32 @@ library
   import: warnings
   hs-source-dirs: src
   exposed-modules:
-      Minithesis
+      Minithesis,
+      Minithesis.Property,
+      Minithesis.Hspec,
+      Minithesis.Tasty
+  other-modules:
+      Minithesis.Cache,
+      Minithesis.Runner,
+      Minithesis.Strategy,
+      Minithesis.TestCase
   build-depends:
       base >=4.14 && <5,
-      random >=1.2 && <1.3
+      bytestring >=0.10 && <0.13,
+      cryptonite >=0.30 && <0.31,
+      memory >=0.16 && <0.19,
+      containers >=0.6 && <0.7,
+      directory >=1.3 && <1.4,
+      filepath >=1.4 && <1.5,
+      random >=1.2 && <1.3,
+      hspec >=2.10 && <2.12,
+      tasty >=1.4 && <1.6,
+      tasty-hunit >=0.10 && <0.11
 
   default-extensions:
       ScopedTypeVariables
 
-test-suite minithesis-hspec
+test-suite minithesis-test
   import: warnings
   type: exitcode-stdio-1.0
   hs-source-dirs: test
@@ -44,24 +65,51 @@ test-suite minithesis-hspec
       Minithesis.Spec
   build-depends:
       base,
+      bytestring >=0.10 && <0.13,
       minithesis,
-      hspec >=2.10,
-      tasty,
-      tasty-hspec
+      cryptonite >=0.30 && <0.31,
+      memory >=0.16 && <0.19,
+      directory >=1.3 && <1.4,
+      sydtest >=0.18 && <0.22
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
 
-test-suite minithesis-tasty
+-- CI-only example suites
+flag ci-tests
+  description: Enable CI-only example test suites
+  manual: True
+  default: False
+
+flag hang-repro
+  description: Build the sydtest concurrency reproducer suite
+  manual: True
+  default: False
+
+test-suite examples-hspec
   import: warnings
   type: exitcode-stdio-1.0
-  hs-source-dirs: test
-  main-is: TastyMain.hs
+  hs-source-dirs: examples/hspec
+  main-is: Spec.hs
   other-modules:
-      Minithesis.Spec
+      Examples.HspecSpec
+  if !flag(ci-tests)
+    buildable: False
   build-depends:
       base,
       minithesis,
-      tasty >=1.4,
-      tasty-hspec >=1.1,
       hspec >=2.10 && <2.12
+
+test-suite examples-tasty
+  import: warnings
+  type: exitcode-stdio-1.0
+  hs-source-dirs: examples/tasty
+  main-is: Spec.hs
+  if !flag(ci-tests)
+    buildable: False
+  build-depends:
+      base,
+      minithesis,
+      tasty >=1.4 && <1.6,
+      tasty-hunit >=0.10 && <0.11
 
 test-suite examples-tasty
   import: warnings

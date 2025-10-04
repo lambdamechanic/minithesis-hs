@@ -4,9 +4,18 @@
 - Use GitHub CI with `haskell-actions/setup` v2 and cache Cabal with the latest `actions/cache` release.
 - Build and test exclusively with Cabal; Stack must not be introduced.
 - Before every commit, run linting, Ormolu formatting, `cabal test`, and `cabal check` locally.
+  - `make format`
+  - `hlint $(git ls-files '*.hs')`
+  - `cabal test all --test-show-details=direct`
+  - `cabal check`
 - After each significant commit, push a suitably named branch and raise a PR.
+- Branching policy: always ensure `main` is up to date before branching.
+  - Run `git fetch origin --prune && git checkout main && git pull --ff-only`.
+  - Then create your feature branch from `main` (e.g., `git checkout -b port/<topic>`).
+  - This avoids unnecessary rebases later.
 - The Haskell test suite must be written with Hspec while still providing runners for both Hspec and Tasty.
 - Port the Python reference test suite incrementally, marking each Python test as `-- PORTED` once its Haskell counterpart exists.
+- The `gh` CLI is available; use it for GitHub operations (e.g., opening PRs) when automation helps.
 
 ## Formatting
 - Ormolu version: we use `ormolu-0.7.7.0` in CI. Install it locally once so results match:

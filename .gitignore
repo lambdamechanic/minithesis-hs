@@ -2,6 +2,7 @@
 .pytest_cache/
 __pycache__/
 .minithesis-cache.*
+.minithesis-hs-db/
 venv
 .pyc
 *.egg-info
@@ -13,3 +14,4 @@ dist-newstyle/
 cabal.project.local
 cabal.project.freeze
 .ghc.environment.*
+sydtest-profile.html

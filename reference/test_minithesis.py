@@ -177,7 +177,7 @@ def test_function_cache():
 
 
 @pytest.mark.parametrize("max_examples", range(1, 100))
-def test_max_examples_is_not_exceeded(max_examples):
+def test_max_examples_is_not_exceeded(max_examples):  # -- PORTED
     """Targeting has a number of places it checks for
     whether we've exceeded the generation limits. This
     makes sure we've checked them all.
@@ -232,7 +232,7 @@ def test_can_target_a_score_upwards_to_interesting(capsys):
     ]
 
 
-def test_can_target_a_score_upwards_without_failing():
+def test_can_target_a_score_upwards_without_failing():  # -- PORTED
     max_score = 0
 
     @run_test(database={}, max_examples=1000)
@@ -268,7 +268,7 @@ def test_targeting_when_most_do_not_benefit(capsys):
     ]
 
 
-def test_can_target_a_score_downwards(capsys):
+def test_can_target_a_score_downwards(capsys):  # -- PORTED
     with pytest.raises(AssertionError):
 
         @run_test(database={}, max_examples=1000)
@@ -287,7 +287,7 @@ def test_can_target_a_score_downwards(capsys):
     ]
 
 
-def test_prints_a_top_level_weighted(capsys):
+def test_prints_a_top_level_weighted(capsys):  # -- PORTED
     with pytest.raises(AssertionError):
 
         @run_test(database={}, max_examples=1000)
@@ -318,27 +318,27 @@ def test_errors_on_too_large_choice():  # -- PORTED
         tc.choice(2 ** 64)
 
 
-def test_can_choose_full_64_bits():
+def test_can_choose_full_64_bits():  # -- PORTED
     @run_test()
     def _(tc):
         tc.choice(2 ** 64 - 1)
 
 
-def test_mapped_possibility():
+def test_mapped_possibility():  # -- PORTED
     @run_test()
     def _(tc):
         n = tc.any(integers(0, 5).map(lambda n: n * 2))
         assert n % 2 == 0
 
 
-def test_selected_possibility():
+def test_selected_possibility():  # -- PORTED
     @run_test()
     def _(tc):
         n = tc.any(integers(0, 5).satisfying(lambda n: n % 2 == 0))
         assert n % 2 == 0
 
 
-def test_bound_possibility():
+def test_bound_possibility():  # -- PORTED
     @run_test()
     def _(tc):
         m, n = tc.any(
@@ -348,7 +348,7 @@ def test_bound_possibility():
         assert m <= n <= m + 10
 
 
-def test_cannot_witness_nothing():
+def test_cannot_witness_nothing():  # -- PORTED
     with pytest.raises(Unsatisfiable):
 
         @run_test()
@@ -356,7 +356,7 @@ def test_cannot_witness_nothing():
             tc.any(nothing())
 
 
-def test_cannot_witness_empty_mix_of():
+def test_cannot_witness_empty_mix_of():  # -- PORTED
     with pytest.raises(Unsatisfiable):
 
         @run_test()
@@ -364,7 +364,7 @@ def test_cannot_witness_empty_mix_of():
             tc.any(mix_of())
 
 
-def test_can_draw_mixture():
+def test_can_draw_mixture():  # -- PORTED
     @run_test()
     def _(tc):
         m = tc.any(mix_of(integers(-5, 0), integers(2, 5)))
@@ -390,7 +390,7 @@ def test_target_and_reduce(capsys):
     assert captured.out.strip() == "choice(100000): 99901"
 
 
-def test_impossible_weighted():
+def test_impossible_weighted():  # -- PORTED
     with pytest.raises(Failure):
 
         @run_test(database={})
@@ -403,7 +403,7 @@ def test_impossible_weighted():
                 raise Failure()
 
 
-def test_guaranteed_weighted():
+def test_guaranteed_weighted():  # -- PORTED
     with pytest.raises(Failure):
 
         @run_test(database={})
@@ -415,14 +415,14 @@ def test_guaranteed_weighted():
                 assert False
 
 
-def test_size_bounds_on_list():
+def test_size_bounds_on_list():  # -- PORTED
     @run_test(database={})
     def _(tc):
         ls = tc.any(lists(integers(0, 10), min_size=1, max_size=3))
         assert 1 <= len(ls) <= 3
 
 
-def test_forced_choice_bounds():
+def test_forced_choice_bounds():  # -- PORTED
     with pytest.raises(ValueError):
 
         @run_test(database={})
