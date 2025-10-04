@@ -1,0 +1,111 @@
+name: minithesis
+version: 0.1.0.0
+author: Minithesis Porting Team
+maintainer: Minithesis Porting Team
+synopsis: A Haskell port of the Minithesis property-based testing prototype
+description: Experimental port of the Minithesis reference implementation from Python to Haskell.
+category: Testing
+license: MPL-2.0
+license-file: reference/LICENSE.txt
+build-type: Simple
+extra-source-files:
+  - README.md
+  - AGENTS.md
+  - PLAN.md
+github: lambdamechanic/minithesis-hs
+
+flags:
+  ci-tests:
+    description: Enable CI-only example test suites
+    manual: true
+    default: false
+  hang-repro:
+    description: Build the sydtest concurrency reproducer suite
+    manual: true
+    default: false
+
+library:
+  source-dirs: src
+  exposed-modules:
+    - Minithesis
+    - Minithesis.Property
+    - Minithesis.Hspec
+    - Minithesis.Tasty
+  other-modules:
+    - Minithesis.Cache
+    - Minithesis.Runner
+    - Minithesis.Strategy
+    - Minithesis.TestCase
+  ghc-options:
+    - -Wall
+    - -Wcompat
+    - -Wredundant-constraints
+  default-extensions:
+    - ScopedTypeVariables
+  language: Haskell2010
+  dependencies:
+    - base >=4.14 && <5
+    - bytestring >=0.10 && <0.13
+    - cryptonite >=0.30 && <0.31
+    - memory >=0.16 && <0.19
+    - containers >=0.6 && <0.8
+    - directory >=1.3 && <1.4
+    - filepath >=1.4 && <1.6
+    - random >=1.2 && <1.3
+    - hspec >=2.9 && <2.12
+    - tasty >=1.4 && <1.7
+    - tasty-hunit >=0.10 && <0.12
+
+tests:
+  minithesis-test:
+    main: Spec.hs
+    source-dirs: test
+    ghc-options:
+      - -Wall
+      - -Wcompat
+      - -Wredundant-constraints
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    language: Haskell2010
+    dependencies:
+      - base
+      - bytestring >=0.10 && <0.13
+      - minithesis
+      - cryptonite >=0.30 && <0.31
+      - memory >=0.16 && <0.19
+      - directory >=1.3 && <1.4
+      - sydtest >=0.18 && <0.22
+
+  examples-hspec:
+    main: Spec.hs
+    source-dirs: examples/hspec
+    ghc-options:
+      - -Wall
+      - -Wcompat
+      - -Wredundant-constraints
+    language: Haskell2010
+    dependencies:
+      - base
+      - minithesis
+      - hspec >=2.9 && <2.12
+    when:
+      - condition: "!flag(ci-tests)"
+        buildable: false
+
+  examples-tasty:
+    main: Spec.hs
+    source-dirs: examples/tasty
+    ghc-options:
+      - -Wall
+      - -Wcompat
+      - -Wredundant-constraints
+    language: Haskell2010
+    dependencies:
+      - base
+      - minithesis
+      - tasty >=1.4 && <1.7
+      - tasty-hunit >=0.10 && <0.12
+    when:
+      - condition: "!flag(ci-tests)"
+        buildable: false
