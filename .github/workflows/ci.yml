@@ -8,6 +8,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      GHC_REQUESTED: latest
+      CABAL_REQUESTED: latest
     permissions:
       security-events: write
 
@@ -17,17 +20,33 @@ jobs:
       - name: HLint scan (code scanning)
         uses: haskell-actions/hlint-scan@v1
 
+      - name: Restore ghcup
+        id: restore-ghcup
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.ghcup
+          key: ${{ runner.os }}-ghcup-${{ env.GHC_REQUESTED }}
+          restore-keys: |
+            ${{ runner.os }}-ghcup-
       - name: Set up Haskell
+        id: setup-haskell
         uses: haskell-actions/setup@v2
         with:
-          ghc-version: "9.8.2"
-          cabal-version: "3.12.1.0"
+          ghc-version: ${{ env.GHC_REQUESTED }}
+          cabal-version: ${{ env.CABAL_REQUESTED }}
 
+      - name: Save ghcup
+        if: steps.restore-ghcup.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.ghcup
+          key: ${{ runner.os }}-ghcup-${{ steps.setup-haskell.outputs.ghc-version }}
       - name: Cache Cabal store
         uses: actions/cache@v4
         with:
           path: |
             ~/.cabal/store
+            ~/.cabal/packages
             dist-newstyle
           key: ${{ runner.os }}-cabal-${{ hashFiles('cabal.project', '**/*.cabal') }}
           restore-keys: |
