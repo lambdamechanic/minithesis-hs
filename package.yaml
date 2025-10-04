@@ -1,7 +1,7 @@
 name: minithesis
 version: 0.1.0.0
-author: Minithesis Porting Team
-maintainer: Minithesis Porting Team
+author: Mark Wotton
+maintainer: Mark Wotton <mwotton@gmail.com>
 synopsis: A Haskell port of the Minithesis property-based testing prototype
 description: Experimental port of the Minithesis reference implementation from Python to Haskell.
 category: Testing

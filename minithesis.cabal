@@ -11,8 +11,8 @@ description:    Experimental port of the Minithesis reference implementation fro
 category:       Testing
 homepage:       https://github.com/lambdamechanic/minithesis-hs#readme
 bug-reports:    https://github.com/lambdamechanic/minithesis-hs/issues
-author:         Minithesis Porting Team
-maintainer:     Minithesis Porting Team
+author:         Mark Wotton
+maintainer:     Mark Wotton <mwotton@gmail.com>
 license:        MPL-2.0
 license-file:   reference/LICENSE.txt
 build-type:     Simple
