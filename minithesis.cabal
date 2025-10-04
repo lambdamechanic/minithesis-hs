@@ -14,6 +14,14 @@ extra-source-files: README.md, AGENTS.md, PLAN.md
 common warnings
   default-language: Haskell2010
   ghc-options: -Wall -Wcompat -Wredundant-constraints
+  build-tool-depends:
+      ormolu:ormolu ==0.7.7.0
+
+-- CI-only example suites
+flag ci-tests
+  description: Enable CI-only example test suites
+  manual: True
+  default: False
 
 library
   import: warnings
@@ -53,5 +61,17 @@ test-suite minithesis-tasty
       minithesis,
       tasty >=1.4,
       tasty-hspec >=1.1,
-      hspec >=2.10
+      hspec >=2.10 && <2.12
 
+test-suite examples-tasty
+  import: warnings
+  type: exitcode-stdio-1.0
+  hs-source-dirs: examples/tasty
+  main-is: Spec.hs
+  if !flag(ci-tests)
+    buildable: False
+  build-depends:
+      base,
+      minithesis,
+      tasty >=1.4 && <1.6,
+      tasty-hunit >=0.10 && <0.11
