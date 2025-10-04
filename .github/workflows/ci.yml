@@ -61,7 +61,7 @@ jobs:
             --ignore-project \
             --installdir="$HOME/.cabal/bin" \
             --overwrite-policy=always \
-            ormolu-0.7.7.0
+            ormolu-0.8.0.2
 
       - name: Ormolu formatting check
         run: |
