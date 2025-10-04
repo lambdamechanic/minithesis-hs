@@ -36,14 +36,6 @@ jobs:
       - name: Update package index
         run: cabal update
 
-      - name: Install tooling (Ormolu only)
-        run: |
-          cabal install \
-            --ignore-project \
-            --installdir="$HOME/.cabal/bin" \
-            --overwrite-policy=always \
-            ormolu-0.7.7.0
-
       - name: Ormolu formatting check
         run: |
           files=$(git ls-files '*.hs')
