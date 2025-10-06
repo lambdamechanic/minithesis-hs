@@ -12,7 +12,7 @@ import Minithesis.Integration
     scopedDatabase,
   )
 import Minithesis.Property (ToProperty (..), applyPropertyOptions, runProperty)
-import Minithesis.Runner
+import Minithesis
   ( RunOptions,
     defaultRunOptions,
     resolveRunOptions,
