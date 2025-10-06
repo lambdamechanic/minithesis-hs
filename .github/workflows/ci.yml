@@ -75,24 +75,28 @@ jobs:
         run: |
           cabal build all --enable-tests --enable-per-component
 
-      - name: Run tests with coverage-for library only (Sydtest profile)
-        env:
-          HSPEC_OPTIONS: "--no-color"
+      - name: Run core Sydtest suite with coverage
         run: |
           set -euo pipefail
-          # Ensure .tix files land in a predictable location
           export HPCTIXDIR="$(pwd)/dist-newstyle"
-          # Extract the unit-id of the library component from the plan
           UNIT_ID=$(jq -r '.__"install-plan"[] | select(."pkg-name" == "minithesis" and ."component-name" == "lib") | ."id"' dist-newstyle/cache/plan.json 2>/dev/null || true)
           if [ -z "$UNIT_ID" ]; then
-            # Fallback for standard jq (no __ quoting) on most runners
             UNIT_ID=$(jq -r '."install-plan"[] | select(."pkg-name" == "minithesis" and ."component-name" == "lib") | ."id"' dist-newstyle/cache/plan.json)
           fi
           echo "Using cabal --coverage-for=${UNIT_ID}"
-          cabal test minithesis-test \
+          cabal test minithesis:minithesis-test \
             --enable-coverage \
             --enable-per-component \
             --coverage-for="${UNIT_ID}" \
+            --test-show-details=streaming \
+            --test-options="--profile" \
+            --test-options="--jobs 1"
+
+      - name: Run Sydtest adapter with profiling
+        run: |
+          set -euo pipefail
+          cabal test minithesis-sydtest:minithesis-sydtest-test \
+            --enable-per-component \
             --test-show-details=streaming \
             --test-options="--profile" \
             --test-options="--jobs 1"
@@ -104,22 +108,21 @@ jobs:
           name: sydtest-profile
           path: sydtest-profile.html
 
-      - name: Run CI-only example tests (Hspec, expect failure)
+      - name: Run Hspec adapter tests
         env:
           HSPEC_OPTIONS: "--no-color"
         run: |
           set -euo pipefail
-          if cabal test -f ci-tests examples-hspec --test-show-details=streaming; then
-            echo "::error ::examples-hspec unexpectedly succeeded; update the expectation in CI"
-            exit 1
-          else
-            echo "examples-hspec failed as expected"
-          fi
+          cabal test minithesis-hspec:minithesis-hspec-test --test-show-details=streaming
 
-      - name: Run CI-only example tests (Tasty)
+      - name: Run Tasty adapter tests
         run: |
           set -euo pipefail
-          cabal test -f ci-tests examples-tasty --test-options='--color=never' --test-show-details=streaming
+          cabal test minithesis-tasty:minithesis-tasty-test --test-options='--color=never' --test-show-details=streaming
 
       - name: Cabal check
-        run: cabal check
+        run: |
+          set -euo pipefail
+          for pkg in minithesis minithesis-hspec minithesis-tasty minithesis-sydtest; do
+            (cd "$pkg" && cabal check)
+          done

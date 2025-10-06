@@ -1,0 +1,48 @@
+cabal-version: 3.4
+
+name:           minithesis-hspec
+version:        0.1.0.0
+synopsis:       Hspec integration for the Minithesis property-testing library
+description:    Adapter utilities that let Hspec suites drive Minithesis properties.
+category:       Testing
+homepage:       https://github.com/lambdamechanic/minithesis-hs#readme
+bug-reports:    https://github.com/lambdamechanic/minithesis-hs/issues
+author:         Mark Wotton
+maintainer:     Mark Wotton <mwotton@gmail.com>
+license:        MPL-2.0
+license-file:   LICENSE
+build-type:     Simple
+
+source-repository head
+  type: git
+  location: https://github.com/lambdamechanic/minithesis-hs
+
+library
+  exposed-modules:
+    Minithesis.Hspec
+  hs-source-dirs:
+    src
+  ghc-options: -Wall -Wcompat -Wredundant-constraints
+  build-depends:
+    base >=4.14 && <5,
+    hspec >=2.9 && <2.12,
+    minithesis >=0.1 && <0.2
+  default-language: Haskell2010
+
+test-suite minithesis-hspec-test
+  type: exitcode-stdio-1.0
+  hs-source-dirs:
+    test
+  main-is: Spec.hs
+  other-modules:
+    Examples.HspecSpec
+    Paths_minithesis_hspec
+  autogen-modules:
+    Paths_minithesis_hspec
+  ghc-options: -Wall -Wcompat -Wredundant-constraints
+  build-depends:
+    base,
+    hspec >=2.9 && <2.12,
+    minithesis >=0.1 && <0.2,
+    minithesis-hspec
+  default-language: Haskell2010
