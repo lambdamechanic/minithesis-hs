@@ -48,3 +48,4 @@ scopedCallsite ignoreSuffixes =
   where
     isInternal name = any (`isSuffixOf` name) ignoreSuffixes
     render name src = srcLocFile src <> ":" <> show (srcLocStartLine src) <> "#" <> name
+{-# ANN scopedCallsite ("HLint: ignore Redundant bracket" :: String) #-}

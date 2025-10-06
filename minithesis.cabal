@@ -26,11 +26,6 @@ flag ci-tests
   manual: True
   default: False
 
-flag hang-repro
-  description: Build the sydtest concurrency reproducer suite
-  manual: True
-  default: False
-
 library
   exposed-modules:
     Minithesis
