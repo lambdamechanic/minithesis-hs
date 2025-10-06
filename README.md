@@ -84,18 +84,18 @@ Minithesis always runs with a failure database. Counterexamples are persisted to
 The Hspec example in particular is short enough to inline here for quick reference:
 
 ```haskell
-module Examples.HspecSpec (spec) where
+module Examples.SydtestSpec (spec) where
 
 import Data.List (sort)
 import Minithesis
-import qualified Minithesis.Hspec as MH
-import Test.Hspec
+import qualified Minithesis.Sydtest as MS
+import Test.Syd
 import Prelude hiding (any)
 
 spec :: Spec
 spec =
   describe "sorting" $ do
-    MH.prop "sorting twice equals sorting once" $
+    MS.prop "sorting twice equals sorting once" $
       withTests 200 $ \tc -> do
         xs <- any tc $ lists (integers (-10) 10) (Just 0) (Just 20)
         sort (sort xs) `shouldBe` sort xs
