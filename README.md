@@ -23,75 +23,54 @@ Re-run the list above before every commit to stay in sync with CI expectations.
 
 ## Running the Examples
 
-Example suites live under `examples/hspec` and `examples/tasty`. They are disabled by default and gated behind the `ci-tests` Cabal flag so that downstream users do not pay for them accidentally. Enable the flag when you want to execute them locally:
+Each adapter package ships a tiny regression suite that also serves as usage documentation. Run them directly from the project root:
 
-- Hspec: `cabal test -fci-tests examples-hspec`
-- Tasty: `cabal test -fci-tests examples-tasty`
+- Hspec: `cabal test minithesis-hspec:minithesis-hspec-test`
+- Tasty: `cabal test minithesis-tasty:minithesis-tasty-test`
+- Sydtest: `cabal test minithesis-sydtest:minithesis-sydtest-test`
 
-Both examples consult the `MINITHESIS_MAX_EXAMPLES` environment variable at runtime. Set it on the command line to raise or lower the number of generated examples (the default is 100):
+All suites honour the `MINITHESIS_MAX_EXAMPLES` environment variable at runtime. Set it on the command line to raise or lower the number of generated examples (the default is 100):
 
 ```bash
-MINITHESIS_MAX_EXAMPLES=500 cabal test -fci-tests examples-hspec
-MINITHESIS_MAX_EXAMPLES=25 cabal test -fci-tests examples-tasty
+MINITHESIS_MAX_EXAMPLES=500 cabal test minithesis-hspec:minithesis-hspec-test
+MINITHESIS_MAX_EXAMPLES=25 cabal test minithesis-tasty:minithesis-tasty-test
 ```
 
 ### Opting into the adapters
 
-The core library stays free of framework dependencies. Opt into the adapters explicitly from your package description:
+The core package stays free of framework dependencies. Pull in whichever integration package you need from Cabal/Stack:
 
 ```cabal
-test-suite my-tests
+test-suite my-hspec-tests
   type: exitcode-stdio-1.0
   hs-source-dirs: test
   main-is: Spec.hs
   build-depends:
       base
     , minithesis
-    , minithesis:hspec
+    , minithesis-hspec
     , hspec
 
-test-suite tasty-tests
+test-suite my-tasty-tests
   type: exitcode-stdio-1.0
   hs-source-dirs: test
   main-is: Spec.hs
   build-depends:
       base
     , minithesis
-    , minithesis:tasty
+    , minithesis-tasty
     , tasty
     , tasty-hunit
-```
 
-### Writing properties
-
-`Minithesis.Hspec.prop` and `Minithesis.Tasty.testProperty` accept either a raw `TestCase -> IO ()` function or the richer `Property` type. Use the helper `withTests` to override the number of examples from code while retaining environment overrides for quick experimentation.
-
-The Hspec example in particular is short enough to inline here for quick reference:
-=======
-## Day-to-day Development
-
-The repository is Cabal-first and ships a small Makefile helper:
-
-- `cabal build`
-- `make format` (runs `ormolu-0.8.0.2` over all tracked `.hs` files)
-- `hlint $(git ls-files '*.hs')`
-- `cabal test all --test-show-details=direct`
-- `cabal check`
-
-Re-run the list above before every commit to stay in sync with CI expectations.
-
-## Running the Examples
-
-Example suites live under `examples/hspec` and `examples/tasty`. They are disabled by default and gated behind the `ci-tests` Cabal flag so that downstream users do not pay for them accidentally. Enable the flag when you want to execute them locally:
-
-- Hspec: `cabal test -fci-tests examples-hspec`
-- Tasty: `cabal test -fci-tests examples-tasty`
-
-Both examples consult the `MINITHESIS_MAX_EXAMPLES` environment variable at runtime. Set it on the command line to raise or lower the number of generated examples (the default is 100):
-
-```bash
-MINITHESIS_MAX_EXAMPLES=500 cabal test -fci-tests examples-hspec
-MINITHESIS_MAX_EXAMPLES=25 cabal test -fci-tests examples-tasty
+test-suite my-sydtest-tests
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Spec.hs
+  build-depends:
+      base
+    , minithesis
+    , minithesis-sydtest
+    , sydtest
 ```
 
 ## Failure database
@@ -100,7 +79,7 @@ Minithesis always runs with a failure database. Counterexamples are persisted to
 
 ### Writing properties
 
-`Minithesis.Hspec.prop` and `Minithesis.Tasty.testProperty` accept either a raw `TestCase -> IO ()` function or the richer `Property` type. Use the helper `withTests` to override the number of examples from code while retaining environment overrides for quick experimentation.
+`Minithesis.Hspec.prop`, `Minithesis.Tasty.testProperty`, and `Minithesis.Sydtest.prop` accept either a raw `TestCase -> IO ()` function or the richer `Property` type. Use the helper `withTests` to override the number of examples from code while still respecting environment overrides for quick experimentation.
 
 The Hspec example in particular is short enough to inline here for quick reference:
 
@@ -134,12 +113,7 @@ Set `MINITHESIS_MAX_EXAMPLES` to control the global example budget (default 100)
 MINITHESIS_MAX_EXAMPLES=500 cabal test minithesis-test --test-show-details=direct
 ```
 
-The same knob applies to the example suites under `examples/hspec` and `examples/tasty`. They are disabled by default; enable them with the `ci-tests` flag when you want to exercise them locally:
-
-```bash
-cabal test -fci-tests examples-hspec
-cabal test -fci-tests examples-tasty
-```
+The same knob applies to the adapter suites shown above, so you can raise or lower exploration for Hspec, Tasty, or Sydtest runs uniformly.
 
 ## Reference material
 

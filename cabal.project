@@ -1,0 +1,6 @@
+packages:
+  minithesis
+  minithesis-hspec
+  minithesis-tasty
+  minithesis-sydtest
+

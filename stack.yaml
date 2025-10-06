@@ -1,0 +1,8 @@
+resolver: nightly-2024-10-01
+packages:
+  - minithesis
+  - minithesis-hspec
+  - minithesis-tasty
+  - minithesis-sydtest
+extra-deps:
+  - sydtest-0.21.0.0

@@ -1,7 +1,7 @@
 module Main (main) where
 
 import qualified Minithesis.Spec as Spec
-import Test.Syd (sydTest)
+import Test.Hspec (hspec)
 
 main :: IO ()
-main = sydTest Spec.spec
+main = hspec Spec.spec

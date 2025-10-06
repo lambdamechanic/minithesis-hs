@@ -1,0 +1,65 @@
+cabal-version: 3.4
+
+name:           minithesis
+version:        0.1.0.0
+synopsis:       A Haskell port of the Minithesis property-based testing prototype
+description:    Experimental port of the Minithesis reference implementation from Python to Haskell.
+category:       Testing
+homepage:       https://github.com/lambdamechanic/minithesis-hs#readme
+bug-reports:    https://github.com/lambdamechanic/minithesis-hs/issues
+author:         Mark Wotton
+maintainer:     Mark Wotton <mwotton@gmail.com>
+license:        MPL-2.0
+license-file:   LICENSE
+build-type:     Simple
+
+source-repository head
+  type: git
+  location: https://github.com/lambdamechanic/minithesis-hs
+
+library
+  exposed-modules:
+    Minithesis
+    Minithesis.Integration
+    Minithesis.Property
+  other-modules:
+    Minithesis.Cache
+    Minithesis.Runner
+    Minithesis.Strategy
+    Minithesis.TestCase
+  hs-source-dirs:
+    src
+  default-extensions:
+    ScopedTypeVariables
+  ghc-options: -Wall -Wcompat -Wredundant-constraints
+  build-depends:
+    base >=4.14 && <5,
+    bytestring >=0.10 && <0.13,
+    containers >=0.6 && <0.8,
+    cryptonite ==0.30.*,
+    directory ==1.3.*,
+    filepath >=1.4 && <1.6,
+    memory >=0.16 && <0.19,
+    random ==1.2.*
+  default-language: Haskell2010
+
+test-suite minithesis-test
+  type: exitcode-stdio-1.0
+  hs-source-dirs:
+    test
+  main-is: Spec.hs
+  other-modules:
+    Minithesis.Spec
+    Paths_minithesis
+  autogen-modules:
+    Paths_minithesis
+  ghc-options: -Wall -Wcompat -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+    base,
+    bytestring >=0.10 && <0.13,
+    cryptonite ==0.30.*,
+    directory ==1.3.*,
+    hspec >=2.9 && <2.12,
+    memory >=0.16 && <0.19,
+    minithesis
+  default-language: Haskell2010

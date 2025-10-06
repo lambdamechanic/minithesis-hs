@@ -21,9 +21,12 @@ lint:
 	fi
 
 test:
-	HSPEC_OPTIONS="--no-color" $(CABAL) test minithesis-test --test-show-details=direct
+	$(CABAL) test all --test-show-details=direct
 
 check:
-	$(CABAL) check
+	$(CABAL) check minithesis
+	$(CABAL) check minithesis-hspec
+	$(CABAL) check minithesis-tasty
+	$(CABAL) check minithesis-sydtest
 
 validate: format lint test check
