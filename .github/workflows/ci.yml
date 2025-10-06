@@ -75,9 +75,7 @@ jobs:
         run: |
           cabal build all --enable-tests --enable-per-component
 
-      - name: Run core tests with coverage
-        env:
-          HSPEC_OPTIONS: "--no-color"
+      - name: Run core Sydtest suite with coverage
         run: |
           set -euo pipefail
           export HPCTIXDIR="$(pwd)/dist-newstyle"
@@ -90,7 +88,9 @@ jobs:
             --enable-coverage \
             --enable-per-component \
             --coverage-for="${UNIT_ID}" \
-            --test-show-details=streaming
+            --test-show-details=streaming \
+            --test-options="--profile" \
+            --test-options="--jobs 1"
 
       - name: Run Sydtest adapter with profiling
         run: |

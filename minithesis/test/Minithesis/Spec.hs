@@ -7,7 +7,7 @@ import Data.Functor (void)
 import Data.IORef
 import Minithesis
 import qualified Minithesis.Property as MP
-import Test.Hspec
+import Test.Syd
 import Prelude hiding (any)
 
 spec :: Spec
