@@ -3,7 +3,20 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/topics/lock_files
 
-packages: []
+packages:
+- completed:
+    commit: b7c4a5f4e4f2182c2b590529f60eb7319703c5c6
+    git: https://github.com/lambdamechanic/sydtest.git
+    name: sydtest
+    pantry-tree:
+      sha256: 2951471bc85da65a7cc4b1f6cd4d57abc1ee2bcea799b8bdd21d6e747ab4b94b
+      size: 2188
+    subdir: sydtest
+    version: 0.21.0.0
+  original:
+    commit: b7c4a5f4e4f2182c2b590529f60eb7319703c5c6
+    git: https://github.com/lambdamechanic/sydtest.git
+    subdir: sydtest
 snapshots:
 - completed:
     sha256: 0c4f0f7c5fad7c89d1df0c0f20eb1bd08020bd0295bb4ba1831fd023dd7da5cf

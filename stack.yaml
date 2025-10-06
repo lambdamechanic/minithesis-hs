@@ -4,5 +4,8 @@ packages:
   - minithesis-hspec
   - minithesis-tasty
   - minithesis-sydtest
-  - /home/mark/lambdalabs/sydtest/sydtest
-extra-deps: []
+extra-deps:
+  - git: https://github.com/lambdamechanic/sydtest.git
+    commit: b7c4a5f4e4f2182c2b590529f60eb7319703c5c6
+    subdirs:
+      - sydtest
