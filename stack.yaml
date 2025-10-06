@@ -4,5 +4,5 @@ packages:
   - minithesis-hspec
   - minithesis-tasty
   - minithesis-sydtest
-extra-deps:
-  - sydtest-0.21.0.0
+  - /home/mark/lambdalabs/sydtest/sydtest
+extra-deps: []
