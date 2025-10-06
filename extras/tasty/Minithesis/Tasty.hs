@@ -5,13 +5,6 @@ module Minithesis.Tasty
 where
 
 import GHC.Stack (HasCallStack, withFrozenCallStack)
-import Minithesis.Integration
-  ( databaseDisabled,
-    hashedLabel,
-    scopedCallsite,
-    scopedDatabase,
-  )
-import Minithesis.Property (ToProperty (..), applyPropertyOptions, runProperty)
 import Minithesis
   ( RunOptions,
     defaultRunOptions,
@@ -19,6 +12,13 @@ import Minithesis
     runDatabase,
     runDatabaseKey,
   )
+import Minithesis.Integration
+  ( databaseDisabled,
+    hashedLabel,
+    scopedCallsite,
+    scopedDatabase,
+  )
+import Minithesis.Property (ToProperty (..), applyPropertyOptions, runProperty)
 import Test.Tasty (TestTree)
 import Test.Tasty.HUnit (testCase)
 
