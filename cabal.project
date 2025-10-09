@@ -3,6 +3,7 @@ packages:
   minithesis-hspec
   minithesis-tasty
   minithesis-sydtest
+  minithesis-generic
 
 source-repository-package
   type: git
