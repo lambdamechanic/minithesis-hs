@@ -1,13 +1,16 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Minithesis.GenericSpec (spec) where
 
+import Control.Monad (when)
 import Data.Word (Word64)
 import GHC.Generics (Generic)
-import Minithesis (Strategy, any, withChoices)
+import Minithesis (Strategy, any, integers, named, withChoices)
 import Minithesis.Generic (HasStrategy (strategy))
-import Test.Syd
+import Minithesis.Sydtest (prop)
+import Test.Syd hiding (prop)
 import Prelude hiding (any)
 
 newtype WrappedInt = WrappedInt Int
@@ -29,6 +32,14 @@ data Shape
   deriving stock (Eq, Show, Generic)
 
 instance HasStrategy Shape
+
+instance HasStrategy Int where
+  strategy =
+    let lo, hi :: Integer
+        lo = -1000
+        hi = 1000
+     in named "int" show $
+          fmap fromInteger (integers lo hi)
 
 spec :: Spec
 spec = do
@@ -77,6 +88,14 @@ spec = do
       withChoices offsets False $ \tc -> do
         result <- any tc (strategy :: Strategy Shape)
         result `shouldBe` Rectangle False True
+
+  prop "derived strategy for Foo respects test-int bounds" $ \tc -> do
+    Foo (WrappedInt n) _ <- any tc (strategy :: Strategy Foo)
+    let lo = -1000
+        hi = 1000
+    when (n < lo || n > hi) $
+      expectationFailure $
+        "WrappedInt out of bounds: " <> show n
 
 intOffset :: Int -> Word64
 intOffset n =

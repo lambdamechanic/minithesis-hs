@@ -11,9 +11,8 @@ module Minithesis.Generic
   )
 where
 
-import Data.Char (chr, ord)
 import GHC.Generics
-import Minithesis (Strategy, integers, just, mixOf, named, nothing)
+import Minithesis (Strategy, just, mixOf, named, nothing)
 
 -- | Types that can supply a 'Strategy'.
 class HasStrategy a where
@@ -69,36 +68,8 @@ instance (GHasStrategy f) => GHasStrategy (M1 S meta f) where
 instance (HasStrategy a) => GHasStrategy (K1 i a) where
   gStrategy = fmap K1 (strategy :: Strategy a)
 
-instance HasStrategy () where
-  strategy = just ()
-
 instance HasStrategy Bool where
   strategy = named "bool" show $ mixOf [just False, just True]
-
-instance HasStrategy Ordering where
-  strategy =
-    named "ordering" show $
-      mixOf [just LT, just EQ, just GT]
-
-instance HasStrategy Int where
-  strategy =
-    let lo, hi :: Integer
-        lo = -1000
-        hi = 1000
-     in named "int" show $
-          fmap fromInteger (integers lo hi)
-
-instance HasStrategy Integer where
-  strategy =
-    named "integer" show $
-      integers (-1000000) 1000000
-
-instance HasStrategy Char where
-  strategy =
-    let lo = ord ' '
-        hi = ord '~'
-     in named "char" (: []) $
-          fmap (chr . fromInteger) (integers (toInteger lo) (toInteger hi))
 
 instance (HasStrategy a) => HasStrategy [a]
 
