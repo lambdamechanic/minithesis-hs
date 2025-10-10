@@ -36,9 +36,11 @@ test-suite minithesis-generic-test
   other-modules:
     Minithesis.GenericSpec
     Paths_minithesis_generic
+  build-tool-depends:
+    sydtest-discover:sydtest-discover
   autogen-modules:
     Paths_minithesis_generic
-  ghc-options: -Wall -Wcompat -Wredundant-constraints
+  ghc-options: -Wall -Wcompat -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
     base,
     minithesis,

@@ -1,3 +1,7 @@
+package *
+  ghc-options: -Wall -Wcompat -Wredundant-constraints -threaded 
+
+
 packages:
   minithesis
   minithesis-hspec
@@ -21,3 +25,9 @@ source-repository-package
   location: https://github.com/lambdamechanic/sydtest.git
   tag: b7c4a5f4e4f2182c2b590529f60eb7319703c5c6
   subdir: sydtest
+
+source-repository-package
+  type: git
+  location: https://github.com/lambdamechanic/sydtest.git
+  tag: b7c4a5f4e4f2182c2b590529f60eb7319703c5c6
+  subdir: sydtest-discover

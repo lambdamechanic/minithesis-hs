@@ -51,6 +51,8 @@ test-suite minithesis-test
   other-modules:
     Minithesis.Spec
     Paths_minithesis
+  build-tool-depends:
+    sydtest-discover:sydtest-discover
   autogen-modules:
     Paths_minithesis
   ghc-options: -Wall -Wcompat -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
