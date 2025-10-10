@@ -127,13 +127,8 @@ instance HasStrategy Int where
      in named "int" show $
           fmap fromInteger (integers lo hi)
 
-newtype WrappedInt = WrappedInt Int
-  deriving stock (Eq, Show, Generic)
-
-instance HasStrategy WrappedInt -- uses the default genericStrategy
-
 data Foo = Foo
-  { fooNumber :: WrappedInt,
+  { fooNumber :: Int,
     fooFlag :: Maybe Bool
   }
   deriving stock (Eq, Show, Generic)
@@ -143,7 +138,7 @@ instance HasStrategy Foo
 spec :: Spec
 spec =
   MS.prop "generated Foos respect the Int bounds" $ \tc -> do
-    Foo (WrappedInt n) _ <- any tc (strategy :: Strategy Foo)
+    Foo n _ <- any tc (strategy :: Strategy Foo)
     n `shouldSatisfy` \x -> x >= -1000 && x <= 1000
 ```
 
