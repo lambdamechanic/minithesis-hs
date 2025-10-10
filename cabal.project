@@ -7,6 +7,17 @@ packages:
 
 source-repository-package
   type: git
+  location: https://github.com/lambdamechanic/hxt
+  subdir: hxt-xpath
+  tag: d063d93d050367dba7617fa5b937ed609c446671
+
+source-repository-package
+  type: git
+  location: https://github.com/mwotton/quickjs-hs
+  tag: 19e1e832a402e71cad8b2ad6ad9c44c8f5d32cbf
+
+source-repository-package
+  type: git
   location: https://github.com/lambdamechanic/sydtest.git
   tag: b7c4a5f4e4f2182c2b590529f60eb7319703c5c6
   subdir: sydtest
