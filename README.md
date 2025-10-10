@@ -105,6 +105,45 @@ spec =
 - `any`, `lists`, `integers`, and the other strategies mirror Hypothesis names.
 - When a failure occurs, Minithesis shrinks it, prints the exact choices, and records it in the optional database so it replays automatically next run.
 
+### Deriving strategies via `GHC.Generics`
+
+The `minithesis-generic` companion package can derive strategies for your algebraic data types automatically. Define `HasStrategy` instances for the primitive leaves you want to use (e.g. `Int`) and let the generic machinery fill in the rest:
+
+```haskell
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+
+import GHC.Generics (Generic)
+import Minithesis
+import Minithesis.Generic (HasStrategy (..), genericStrategy)
+import qualified Minithesis.Sydtest as MS
+import Test.Syd
+
+-- Pick concrete strategies for your primitive leaves.
+instance HasStrategy Int where
+  strategy =
+    let lo = -1000
+        hi = 1000
+     in named "int" show $
+          fmap fromInteger (integers lo hi)
+
+data Foo = Foo
+  { fooNumber :: Int,
+    fooFlag :: Maybe Bool
+  }
+  deriving stock (Eq, Show, Generic)
+
+instance HasStrategy Foo
+
+spec :: Spec
+spec =
+  MS.prop "generated Foos respect the Int bounds" $ \tc -> do
+    Foo n _ <- any tc (strategy :: Strategy Foo)
+    n `shouldSatisfy` \x -> x >= -1000 && x <= 1000
+```
+
+The derived strategy walks the generic representation of `Foo`, using your leaf strategies (`Int`, `Bool`, `Maybe`, etc.) to generate complete values without bespoke boilerplate. Because the primitive choices live alongside your tests, you can tune them to match the domain you care about.
+
 ### Raising or lowering exploration
 
 Set `MINITHESIS_MAX_EXAMPLES` to control the global example budget (default 100):

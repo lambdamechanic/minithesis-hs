@@ -1,9 +1,9 @@
 cabal-version: 3.4
 
-name:           minithesis
+name:           minithesis-generic
 version:        0.1.0.0
-synopsis:       A Haskell port of the Minithesis property-based testing prototype
-description:    Experimental port of the Minithesis reference implementation from Python to Haskell.
+synopsis:       Generic deriving helpers for Minithesis strategies
+description:    Automatically derive Minithesis strategies for data types with Generic instances.
 category:       Testing
 homepage:       https://github.com/lambdamechanic/minithesis-hs#readme
 bug-reports:    https://github.com/lambdamechanic/minithesis-hs/issues
@@ -19,49 +19,32 @@ source-repository head
 
 library
   exposed-modules:
-    Minithesis
-    Minithesis.Integration
-    Minithesis.Property
-  other-modules:
-    Minithesis.Cache
-    Minithesis.Runner
-    Minithesis.Strategy
-    Minithesis.TestCase
+    Minithesis.Generic
   hs-source-dirs:
     src
-  default-extensions:
-    ScopedTypeVariables
   ghc-options: -Wall -Wcompat -Wredundant-constraints
   build-depends:
     base >=4.14 && <5,
-    bytestring >=0.10 && <0.13,
-    containers >=0.6 && <0.8,
-    cryptonite ==0.30.*,
-    directory ==1.3.*,
-    filepath >=1.4 && <1.6,
-    memory >=0.16 && <0.19,
-    random ==1.2.*
+    minithesis >=0.1 && <0.2
   default-language: Haskell2010
 
-test-suite minithesis-test
+test-suite minithesis-generic-test
   type: exitcode-stdio-1.0
   hs-source-dirs:
     test
   main-is: Spec.hs
   other-modules:
-    Minithesis.Spec
-    Paths_minithesis
+    Minithesis.GenericSpec
+    Paths_minithesis_generic
   build-tool-depends:
     sydtest-discover:sydtest-discover
   autogen-modules:
-    Paths_minithesis
+    Paths_minithesis_generic
   ghc-options: -Wall -Wcompat -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
     base,
-    bytestring >=0.10 && <0.13,
-    cryptonite ==0.30.*,
-    directory ==1.3.*,
-    memory >=0.16 && <0.19,
     minithesis,
+    minithesis-generic,
+    minithesis-sydtest,
     sydtest >=0.17 && <0.23
   default-language: Haskell2010

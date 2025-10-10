@@ -37,6 +37,8 @@ test-suite minithesis-sydtest-test
   other-modules:
     Examples.SydtestSpec
     Paths_minithesis_sydtest
+  build-tool-depends:
+    sydtest-discover:sydtest-discover
   autogen-modules:
     Paths_minithesis_sydtest
   ghc-options: -Wall -Wcompat -Wredundant-constraints

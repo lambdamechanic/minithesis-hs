@@ -2,7 +2,7 @@ CABAL ?= cabal
 # Use the Cabal-installed ormolu explicitly for consistency with CI
 ORMOLU ?= $(CABAL) exec -- ormolu
 HLINT ?= hlint
-HS_SOURCES := $(shell git ls-files --cached --others --exclude-standard -- '*.hs')
+HS_SOURCES := $(shell git ls-files -- '*.hs')
 
 .PHONY: format lint test check validate
 
@@ -28,5 +28,6 @@ check:
 	$(CABAL) check minithesis-hspec
 	$(CABAL) check minithesis-tasty
 	$(CABAL) check minithesis-sydtest
+	$(CABAL) check minithesis-generic
 
 validate: format lint test check
